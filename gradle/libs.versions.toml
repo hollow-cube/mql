@@ -1,0 +1,22 @@
+metadata.format.version = "1.1"
+
+[versions]
+
+jetbrainsAnnotations = "23.0.0"
+asm = "9.4"
+
+nexuspublish = "1.3.0"
+
+[libraries]
+
+jetbrainsAnnotations = { group = "org.jetbrains", name = "annotations", version.ref = "jetbrainsAnnotations" }
+asm-core = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
+asm-util = { group = "org.ow2.asm", name = "asm-util", version.ref = "asm" }
+
+[bundles]
+
+asm = ["asm-core", "asm-util"]
+
+[plugins]
+
+nexuspublish = { id = "io.github.gradle-nexus.publish-plugin", version.ref = "nexuspublish" }
