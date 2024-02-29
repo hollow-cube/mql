@@ -8,7 +8,7 @@ plugins {
 
 group = "dev.hollowcube"
 version = System.getenv("TAG_VERSION") ?: "dev"
-description = "TODO"
+description = "An interpreter and JIT compiler for a subset of Molang"
 
 repositories {
     mavenCentral()
