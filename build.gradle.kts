@@ -33,7 +33,7 @@ java {
 tasks.test {
     useJUnitPlatform()
 
-    jvmArgs("--add-opens", "java.base/java.lang=ALL-UNNAMED")
+//    jvmArgs("--add-opens", "java.base/java.lang=ALL-UNNAMED")
 }
 
 nexusPublishing {

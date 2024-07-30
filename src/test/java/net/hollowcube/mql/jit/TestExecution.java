@@ -3,6 +3,8 @@ package net.hollowcube.mql.jit;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
+import java.lang.invoke.MethodHandles;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestExecution {
@@ -44,7 +46,7 @@ public class TestExecution {
     }
 
     private <T> T compile(@NotNull Class<T> scriptInterface, @NotNull String source) {
-        var compiler = new MqlCompiler<>(scriptInterface);
+        var compiler = new MqlCompiler<>(MethodHandles.lookup(), scriptInterface);
         Class<T> scriptClass = compiler.compile(source);
 
         try {

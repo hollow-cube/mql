@@ -3,6 +3,8 @@ package net.hollowcube.mql.jit;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
+import java.lang.invoke.MethodHandles;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestCompilation {
@@ -68,7 +70,7 @@ public class TestCompilation {
     }
 
     private void check(@NotNull Class<?> script, @NotNull String source, @NotNull String expected) {
-        var compiler = new MqlCompiler<>(script);
+        var compiler = new MqlCompiler<>(MethodHandles.lookup(), script);
         byte[] bytecode = compiler.compileBytecode("mql$test", source);
 
         var str = AsmUtil.prettyPrintEvalMethod(bytecode);

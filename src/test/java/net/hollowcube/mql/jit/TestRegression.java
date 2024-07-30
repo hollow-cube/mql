@@ -6,6 +6,8 @@ import net.hollowcube.mql.util.MqlPrinter;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
+import java.lang.invoke.MethodHandles;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestRegression {
@@ -81,7 +83,7 @@ public class TestRegression {
     }
 
     private void compile(@NotNull Class<?> script, @NotNull String source, @NotNull String expected) {
-        var compiler = new MqlCompiler<>(script);
+        var compiler = new MqlCompiler<>(MethodHandles.lookup(), script);
         byte[] bytecode = compiler.compileBytecode("mql$test", source);
 
         var str = AsmUtil.prettyPrintEvalMethod(bytecode);
@@ -89,7 +91,7 @@ public class TestRegression {
     }
 
     private <T> T execute(@NotNull Class<T> scriptInterface, @NotNull String source) {
-        var compiler = new MqlCompiler<>(scriptInterface);
+        var compiler = new MqlCompiler<>(MethodHandles.lookup(), scriptInterface);
         Class<T> scriptClass = compiler.compile(source);
 
         try {

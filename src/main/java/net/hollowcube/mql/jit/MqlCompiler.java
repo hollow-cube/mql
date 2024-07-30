@@ -10,6 +10,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -32,6 +34,7 @@ public class MqlCompiler<T> {
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private static final ClassInfo MATH_CI = new ClassInfo(MqlMath.class, true);
 
+    private final MethodHandles.Lookup lookup;
     private final Class<?> scriptInterface;
     private final Class<?>[] generics;
 
@@ -39,7 +42,8 @@ public class MqlCompiler<T> {
     private ParamInfo[] evalMethodParams;
     private String evalFnDescriptor;
 
-    public MqlCompiler(Class<T> scriptInterface, Class<?>... generics) {
+    public MqlCompiler(@NotNull MethodHandles.Lookup lookup, Class<T> scriptInterface, Class<?>... generics) {
+        this.lookup = lookup;
         this.scriptInterface = scriptInterface;
         this.generics = generics;
         parseScriptInterface();
@@ -67,7 +71,8 @@ public class MqlCompiler<T> {
         for (Class<?> generic : generics)
             sig.append(AsmUtil.toDescriptor(generic));
         sig.append(">;");
-        scriptClass.visit(V17, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, sig.toString(),
+        var targetPackage = scriptInterface.getPackageName().replace('.', '/');
+        scriptClass.visit(V17, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, targetPackage + "/" + className, sig.toString(),
                 AsmUtil.toName(Object.class), new String[]{AsmUtil.toName(scriptInterface)});
 
         // Generate required synthetics
