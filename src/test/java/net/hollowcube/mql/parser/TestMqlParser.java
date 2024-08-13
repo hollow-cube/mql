@@ -17,13 +17,15 @@ public class TestMqlParser {
         var expr = new MqlParser(input).parse();
         var actual = new MqlPrinter().visit(expr, null);
 
-        assertEquals(expected, actual);
+        assertEquals(expected, actual, "input: " + input);
     }
 
     private static Stream<Arguments> inputPairs() {
         return Stream.of(
                 Arguments.of("basic number",
                         "1", "1.0"),
+                Arguments.of("semicolon",
+                        "1;", "1.0"),
                 Arguments.of("basic ref",
                         "abc", "abc"),
                 Arguments.of("basic add",
@@ -48,12 +50,34 @@ public class TestMqlParser {
                         "q.is_alive()", "(. q is_alive)"),
                 Arguments.of("normalize case 2",
                         "q.is_alive", "(. q is_alive)"),
+                Arguments.of("call with args",
+                        "sin(25)", "(C sin (25.0))"),
+                Arguments.of("call with args 2",
+                        "m.sin(25)", "(C (. m sin) (25.0))"),
                 Arguments.of("single ternary simple",
                         "1 ? 2 : 3", "(? 1.0 2.0 3.0)"),
+                Arguments.of("ternary no false",
+                        "1 ? 2", "(? 1.0 2.0)"),
                 Arguments.of("nested ternary",
                         "1 ? 2 : 3 ? 4 : 5", "(? 1.0 2.0 (? 3.0 4.0 5.0))"),
                 Arguments.of("ternary add precedence",
-                        "1 ? 2 + 3 : 4", "(? 1.0 (+ 2.0 3.0) 4.0)")
+                        "1 ? 2 + 3 : 4", "(? 1.0 (+ 2.0 3.0) 4.0)"),
+                Arguments.of("ternary add precedence",
+                        "1 ? 2 + 3 : 4", "(? 1.0 (+ 2.0 3.0) 4.0)"),
+                Arguments.of("index",
+                        "a[1]", "([ a 1.0)"),
+                Arguments.of("index then call",
+                        "a[1](2)", "(C ([ a 1.0) (2.0))"),
+                Arguments.of("call then index",
+                        "a(2)[1]", "([ (C a (2.0)) 1.0)"),
+                Arguments.of("empty block",
+                        "{}", "{ }"),
+                Arguments.of("single statement block",
+                        "{\n1.0;\n}", "{ 1.0 }"),
+                Arguments.of("multi statement block",
+                        "{\n1.0;\n2.0;\n}", "{ 1.0 2.0 }"),
+                Arguments.of("loop longer",
+                        "loop(5, {\nv.x;})", "(C loop (5.0 { (. v x) }))")
         );
     }
 }

@@ -106,8 +106,13 @@ public class MqlLexer {
                 }
             }
             case ':' -> MqlToken.Type.COLON;
+            case ';' -> MqlToken.Type.SEMICOLON;
             case '(' -> MqlToken.Type.LPAREN;
             case ')' -> MqlToken.Type.RPAREN;
+            case '[' -> MqlToken.Type.LBRACK;
+            case ']' -> MqlToken.Type.RBRACK;
+            case '{' -> MqlToken.Type.LBRACE;
+            case '}' -> MqlToken.Type.RBRACE;
             case '>' -> {
                 if (match('=')) {
                     yield MqlToken.Type.GTE;

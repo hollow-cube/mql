@@ -2,11 +2,11 @@ package net.hollowcube.mql.tree;
 
 import org.jetbrains.annotations.NotNull;
 
-public record MqlCallExpr(@NotNull MqlExpr access, @NotNull MqlArgListExpr argList) implements MqlExpr {
+public record MqlIndexExpr(@NotNull MqlExpr lhs, @NotNull MqlExpr target) implements MqlExpr {
 
     @Override
     public <P, R> R visit(@NotNull MqlVisitor<P, R> visitor, P p) {
-        return visitor.visitCallExpr(this, p);
+        return visitor.visitIndexExpr(this, p);
     }
 
 }

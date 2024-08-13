@@ -36,6 +36,24 @@ public class TestCompilation {
     }
 
     @Test
+    public void ternary() {
+        check(BaseScript.class, "1 == 2 ? 3 : 4", """
+                DCONST_1
+                LDC 2.0
+                INVOKESTATIC net/hollowcube/mql/jit/MqlRuntime.eq (DD)D
+                DCONST_0
+                DCMPL
+                IFEQ L0
+                LDC 3.0
+                GOTO L1
+                L0
+                LDC 4.0
+                L1
+                DRETURN
+                """);
+    }
+
+    @Test
     public void callQuerySingleArg() {
         check(QueryScript.class, "q.dbl(1.0)", """
                 ALOAD 1

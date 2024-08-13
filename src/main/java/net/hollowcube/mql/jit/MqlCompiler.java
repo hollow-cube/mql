@@ -8,9 +8,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
-import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -65,7 +65,7 @@ public class MqlCompiler<T> {
         MqlExpr expr = new MqlParser(script).parse();
 
         // Create the class
-        ClassWriter scriptClass = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        ClassWriter scriptClass = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         var sig = new StringBuilder();
         sig.append('L').append(AsmUtil.toName(scriptInterface)).append('<');
         for (Class<?> generic : generics)
@@ -146,10 +146,12 @@ public class MqlCompiler<T> {
 
         @Override
         public Void visitCallExpr(MqlCallExpr expr, Void unused) {
-            if (!(expr.access().lhs() instanceof MqlIdentExpr ident))
+            if (!(expr.access() instanceof MqlAccessExpr access))
+                throw new UnsupportedOperationException("non-access queries are not supported");
+            if (!(access.lhs() instanceof MqlIdentExpr ident))
                 throw new UnsupportedOperationException("Nested queries are not supported");
 
-            handleCall(ident.value(), expr.access().target(), expr.argList());
+            handleCall(ident.value(), access.target(), expr.argList());
             return null;
         }
 
@@ -221,20 +223,33 @@ public class MqlCompiler<T> {
 
         @Override
         public Void visitTernaryExpr(MqlTernaryExpr expr, Void unused) {
-            //todo this is a cursed implementation. It needs to be implemented in java for sanity,
-            // but also because this is semantically incorrect. The ternary operator is not short-circuiting.
+
+            Label falseJump = new Label(), endJump = new Label();
+
             visit(expr.condition(), null);
+            method.visitInsn(DCONST_0);
+            method.visitInsn(DCMPL);
+            method.visitJumpInsn(IFEQ, falseJump); // if equal to zero 0, jump to false case
+
             visit(expr.trueCase(), null);
-            visit(expr.falseCase(), null);
+            method.visitJumpInsn(GOTO, endJump);
 
-            method.visitMethodInsn(INVOKESTATIC, AsmUtil.toName(MqlRuntime.class), "ternary", "(DDD)D", false);
-
+            method.visitLabel(falseJump);
+            if (expr.falseCase() == null) {
+                // If we have no false case, just push 0.
+                method.visitInsn(DCONST_0);
+            } else {
+                visit(expr.falseCase(), null);
+            }
+            
+            // Jump to whatever the next expression will be.
+            method.visitLabel(endJump);
             return null;
         }
 
         @Override
         public Void visitNumberExpr(@NotNull MqlNumberExpr expr, Void unused) {
-            double value = expr.value().value();
+            double value = expr.value();
             if (value == 0) {
                 method.visitInsn(DCONST_0);
             } else if (value == 1) {
@@ -255,7 +270,8 @@ public class MqlCompiler<T> {
         var fnDesc = new StringBuilder().append('(');
         for (var method : scriptInterface.getMethods()) {
             if ((method.getModifiers() & Modifier.ABSTRACT) == 0) continue;
-            if (evalMethod != null) throw new IllegalArgumentException("Script interface must have exactly one abstract method");
+            if (evalMethod != null)
+                throw new IllegalArgumentException("Script interface must have exactly one abstract method");
             evalMethod = method;
         }
         if (evalMethod == null) throw new IllegalArgumentException("Script interface must have exactly one abstract");
@@ -264,7 +280,8 @@ public class MqlCompiler<T> {
         for (int i = 0; i < evalMethod.getParameterCount(); i++) {
             var param = evalMethod.getParameters()[i];
             MqlEnv env = param.getAnnotation(MqlEnv.class);
-            if (env == null) throw new IllegalArgumentException("Script interface parameters must be annotated with @MqlEnv");
+            if (env == null)
+                throw new IllegalArgumentException("Script interface parameters must be annotated with @MqlEnv");
 
             if (param.getParameterizedType() instanceof ParameterizedType) {
                 if (genericIndex >= generics.length) throw new IllegalArgumentException("Too many generic parameters");

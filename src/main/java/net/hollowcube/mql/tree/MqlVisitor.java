@@ -25,17 +25,39 @@ public interface MqlVisitor<P, R> {
         return defaultValue();
     }
 
-    default R visitArgListExpr(MqlArgListExpr mqlArgListExpr, P p) {
+    default R visitArgListExpr(@NotNull MqlArgListExpr mqlArgListExpr, P p) {
         return defaultValue();
     }
 
-    ;
-
-    default R visitTernaryExpr(MqlTernaryExpr expr, P p) {
+    default R visitTernaryExpr(@NotNull MqlTernaryExpr expr, P p) {
         return defaultValue();
     }
 
-    default R visitCallExpr(MqlCallExpr expr, P p) {
+    default R visitCallExpr(@NotNull MqlCallExpr expr, P p) {
+        return defaultValue();
+    }
+
+    default R visitBlockExpr(@NotNull MqlBlockExpr expr, P p) {
+        return defaultValue();
+    }
+
+    default R visitIndexExpr(@NotNull MqlIndexExpr expr, P p) {
+        return defaultValue();
+    }
+
+    default R visitThisExpr(@NotNull MqlThisExpr expr, P p) {
+        return defaultValue();
+    }
+
+    default R visitContinueExpr(@NotNull MqlContinueExpr expr, P p) {
+        return defaultValue();
+    }
+
+    default R visitBreakExpr(@NotNull MqlBreakExpr expr, P p) {
+        return defaultValue();
+    }
+
+    default R visitReturnExpr(@NotNull MqlReturnExpr expr, P p) {
         return defaultValue();
     }
 

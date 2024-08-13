@@ -1,13 +1,10 @@
 package net.hollowcube.mql.runtime;
 
-import net.hollowcube.mql.foreign.MqlForeignFunctions;
 import net.hollowcube.mql.foreign.Query;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 public class MqlMath {
-
-    public static final MqlScope INSTANCE = MqlForeignFunctions.create(MqlMath.class, null);
 
     private MqlMath() {
     }
@@ -120,7 +117,7 @@ public class MqlMath {
     @Query
     public static double hermiteBlend(double value) {
         //todo: implement me
-        throw new MqlRuntimeError("hermite_blend not implemented");
+        throw new UnsupportedOperationException("hermite_blend not implemented");
     }
 
     /**
@@ -176,7 +173,7 @@ public class MqlMath {
     @Query
     public static double minAngle(double value) {
         //todo: implement me
-        throw new MqlRuntimeError("hermite_blend not implemented");
+        throw new UnsupportedOperationException("min_angle not implemented");
     }
 
     /**

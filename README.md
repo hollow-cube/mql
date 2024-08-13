@@ -36,3 +36,9 @@ See the [docs](./docs/Basic%20Usage.md).
 ## License
 
 This project is licensed under the [MIT License](../../LICENSE).
+
+Things pending compilation
+
+* blocks {}
+* array index
+* break, return, continue, this

@@ -35,6 +35,10 @@ public class TestMqlLexer {
                 Arguments.of("??", MqlToken.Type.QUESTIONQUESTION),
                 Arguments.of("(", MqlToken.Type.LPAREN),
                 Arguments.of(")", MqlToken.Type.RPAREN),
+                Arguments.of("[", MqlToken.Type.LBRACK),
+                Arguments.of("]", MqlToken.Type.RBRACK),
+                Arguments.of("{", MqlToken.Type.LBRACE),
+                Arguments.of("}", MqlToken.Type.RBRACE),
 
                 Arguments.of("123", MqlToken.Type.NUMBER),
                 Arguments.of("123.", MqlToken.Type.NUMBER),

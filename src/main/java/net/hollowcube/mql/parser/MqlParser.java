@@ -32,28 +32,35 @@ public class MqlParser {
 
                 lhs = switch (op) {
                     case TERNARY -> {
-                        var trueExpr = expr(0);
-                        lexer.expect(MqlToken.Type.COLON);
-                        var falseExpr = expr(postfixBindingPower);
+                        MqlExpr trueExpr = expr(0), falseExpr = null;
+
+                        var next = lexer.peek(); // Optional false expr
+                        if (next != null && next.type() == MqlToken.Type.COLON) {
+                            lexer.expect(MqlToken.Type.COLON);
+                            falseExpr = expr(postfixBindingPower);
+                        }
+
                         yield new MqlTernaryExpr(lhs, trueExpr, falseExpr);
                     }
                     case LPAREN -> {
-                        if (lhs instanceof MqlAccessExpr access) {
-                            // Get argument list
-                            List<MqlExpr> args = new ArrayList<>();
-                            var next = lexer.peek();
+                        // Get argument list
+                        List<MqlExpr> args = new ArrayList<>();
+                        var next = lexer.peek();
 
-                            if (next != null && next.type() != MqlToken.Type.RPAREN) {
-                                do {
-                                    args.add(expr(0));
-                                    next = lexer.peek();
-                                } while (next != null && next.type() == MqlToken.Type.COMMA && lexer.next() != null);
-
-                                lexer.expect(MqlToken.Type.RPAREN);
-                                yield new MqlCallExpr(access, new MqlArgListExpr(args));
-                            }
+                        if (next != null && next.type() != MqlToken.Type.RPAREN) {
+                            do {
+                                args.add(expr(0));
+                                next = lexer.peek();
+                            } while (next != null && next.type() == MqlToken.Type.COMMA && lexer.next() != null);
                         }
-                        yield lhs;
+
+                        lexer.expect(MqlToken.Type.RPAREN);
+                        yield args.isEmpty() ? lhs : new MqlCallExpr(lhs, new MqlArgListExpr(args));
+                    }
+                    case LBRACK -> {
+                        var target = expr(0);
+                        lexer.expect(MqlToken.Type.RBRACK);
+                        yield new MqlIndexExpr(lhs, target);
                     }
                     default -> throw new IllegalStateException("Unexpected value: " + op);
                 };
@@ -90,7 +97,21 @@ public class MqlParser {
 
         return switch (token.type()) {
             case NUMBER -> new MqlNumberExpr(Double.parseDouble(lexer.span(token)));
-            case IDENT -> new MqlIdentExpr(lexer.span(token));
+            case IDENT -> {
+                var span = lexer.span(token);
+                yield switch (span) {
+                    case "this" -> MqlThisExpr.INSTANCE;
+                    case "continue" -> MqlContinueExpr.INSTANCE;
+                    case "break" -> MqlBreakExpr.INSTANCE;
+                    case "return" -> {
+                        var next = lexer.peek();
+                        if (next != null && next.type() != MqlToken.Type.SEMICOLON)
+                            yield new MqlReturnExpr(expr(0));
+                        yield new MqlReturnExpr(null);
+                    }
+                    default -> new MqlIdentExpr(span);
+                };
+            }
             case MINUS -> {
                 var rhs = expr(Operator.MINUS.prefixBindingPower());
                 yield new MqlUnaryExpr(MqlUnaryExpr.Op.NEGATE, rhs);
@@ -99,6 +120,19 @@ public class MqlParser {
                 var expr = expr(0);
                 lexer.expect(MqlToken.Type.RPAREN);
                 yield expr;
+            }
+            case LBRACE -> {
+                var exprs = new ArrayList<MqlExpr>();
+                var next = lexer.peek();
+                if (next == null) throw new MqlParseError("unexpected end of input");
+                while (next.type() != MqlToken.Type.RBRACE) {
+                    exprs.add(expr(0));
+                    lexer.expect(MqlToken.Type.SEMICOLON);
+                    next = lexer.peek();
+                    if (next == null) throw new MqlParseError("unexpected end of input");
+                }
+                lexer.expect(MqlToken.Type.RBRACE);
+                yield new MqlBlockExpr(exprs);
             }
             //todo better error handling
             default -> throw new MqlParseError("unexpected token " + token);
@@ -117,6 +151,7 @@ public class MqlParser {
             case QUESTION -> Operator.TERNARY;
             case QUESTIONQUESTION -> Operator.NULL_COALESCE;
             case LPAREN -> Operator.LPAREN;
+            case LBRACK -> Operator.LBRACK;
             case GTE -> Operator.GTE;
             case GE -> Operator.GE;
             case LTE -> Operator.LTE;
@@ -134,6 +169,7 @@ public class MqlParser {
         DIV(27, 28, MqlBinaryExpr.Op.DIV),
         MUL(27, 28, MqlBinaryExpr.Op.MUL),
         LPAREN(30, 30, null),
+        LBRACK(30, 30, null),
 
         GTE(30, 31, MqlBinaryExpr.Op.GTE),
         GE(30, 31, MqlBinaryExpr.Op.GE),
@@ -165,7 +201,7 @@ public class MqlParser {
         public int postfixBindingPower() {
             return switch (this) {
                 case TERNARY -> 1;
-                case LPAREN -> 34;
+                case LPAREN, LBRACK -> 34;
                 default -> -1;
             };
         }

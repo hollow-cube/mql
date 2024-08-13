@@ -1,16 +1,10 @@
 package net.hollowcube.mql.tree;
 
-import net.hollowcube.mql.runtime.MqlScope;
-import net.hollowcube.mql.value.MqlValue;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-public record MqlArgListExpr(List<MqlExpr> args) implements MqlExpr {
-    @Override
-    public MqlValue evaluate(@NotNull MqlScope scope) {
-        return null;
-    }
+public record MqlArgListExpr(@NotNull List<MqlExpr> args) implements MqlExpr {
 
     @Override
     public <P, R> R visit(@NotNull MqlVisitor<P, R> visitor, P p) {
@@ -20,4 +14,5 @@ public record MqlArgListExpr(List<MqlExpr> args) implements MqlExpr {
     public int size() {
         return args().size();
     }
+    
 }

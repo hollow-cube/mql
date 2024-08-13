@@ -75,21 +75,67 @@ public class MqlPrinter implements MqlVisitor<Void, String> {
 
     @Override
     public String visitTernaryExpr(MqlTernaryExpr expr, Void unused) {
-        return String.format(
-                "(? %s %s %s)",
-                visit(expr.condition(), null),
-                visit(expr.trueCase(), null),
-                visit(expr.falseCase(), null)
-        );
+        var builder = new StringBuilder();
+        builder.append("(? ");
+        builder.append(visit(expr.condition(), null));
+        builder.append(" ");
+        builder.append(visit(expr.trueCase(), null));
+        if (expr.falseCase() != null) {
+            builder.append(" ");
+            builder.append(visit(expr.falseCase(), null));
+        }
+        builder.append(")");
+        return builder.toString();
     }
 
     @Override
     public String visitCallExpr(MqlCallExpr expr, Void unused) {
         return String.format(
-                "(? %s %s)",
+                "(C %s %s)",
                 visit(expr.access(), null),
                 visit(expr.argList(), null)
         );
+    }
+
+    @Override
+    public String visitThisExpr(@NotNull MqlThisExpr expr, Void unused) {
+        return "this";
+    }
+
+    @Override
+    public String visitContinueExpr(@NotNull MqlContinueExpr expr, Void unused) {
+        return "continue";
+    }
+
+    @Override
+    public String visitBreakExpr(@NotNull MqlBreakExpr expr, Void unused) {
+        return "break";
+    }
+
+    @Override
+    public String visitReturnExpr(@NotNull MqlReturnExpr expr, Void unused) {
+        return "return";
+    }
+
+    @Override
+    public String visitIndexExpr(@NotNull MqlIndexExpr expr, Void unused) {
+        return String.format(
+                "([ %s %s)",
+                visit(expr.lhs(), null),
+                visit(expr.target(), null)
+        );
+    }
+
+    @Override
+    public String visitBlockExpr(@NotNull MqlBlockExpr expr, Void unused) {
+        var builder = new StringBuilder();
+        builder.append("{ ");
+        for (var stmt : expr.exprs()) {
+            builder.append(visit(stmt, null));
+            builder.append(" ");
+        }
+        builder.append("}");
+        return builder.toString();
     }
 
     @Override
