@@ -1,9 +1,11 @@
 package net.hollowcube.mql.jit;
 
+import net.hollowcube.mql.foreign.MqlEnv;
 import net.hollowcube.mql.foreign.Query;
+import net.hollowcube.mql.internal.MqlRuntime;
+import net.hollowcube.mql.internal.tree.*;
 import net.hollowcube.mql.parser.MqlParser;
-import net.hollowcube.mql.runtime.MqlMath;
-import net.hollowcube.mql.tree.*;
+import net.hollowcube.mql.builtin.MqlMath;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 import org.objectweb.asm.ClassVisitor;
@@ -241,7 +243,7 @@ public class MqlCompiler<T> {
             } else {
                 visit(expr.falseCase(), null);
             }
-            
+
             // Jump to whatever the next expression will be.
             method.visitLabel(endJump);
             return null;

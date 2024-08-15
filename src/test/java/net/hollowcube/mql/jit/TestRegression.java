@@ -1,8 +1,9 @@
 package net.hollowcube.mql.jit;
 
+import net.hollowcube.mql.foreign.MqlEnv;
 import net.hollowcube.mql.foreign.Query;
 import net.hollowcube.mql.parser.MqlParser;
-import net.hollowcube.mql.util.MqlPrinter;
+import net.hollowcube.mql.internal.MqlPrinter;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 

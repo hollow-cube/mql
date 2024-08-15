@@ -1,6 +1,6 @@
 package net.hollowcube.mql.parser;
 
-import net.hollowcube.mql.tree.*;
+import net.hollowcube.mql.internal.tree.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

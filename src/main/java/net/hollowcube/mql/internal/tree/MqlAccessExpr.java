@@ -1,4 +1,4 @@
-package net.hollowcube.mql.tree;
+package net.hollowcube.mql.internal.tree;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -8,5 +8,5 @@ public record MqlAccessExpr(@NotNull MqlExpr lhs, String target) implements MqlE
     public <P, R> R visit(@NotNull MqlVisitor<P, R> visitor, P p) {
         return visitor.visitAccessExpr(this, p);
     }
-    
+
 }

@@ -1,4 +1,4 @@
-package net.hollowcube.mql.jit;
+package net.hollowcube.mql.foreign;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

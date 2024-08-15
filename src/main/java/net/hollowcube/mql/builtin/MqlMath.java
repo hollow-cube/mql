@@ -1,4 +1,4 @@
-package net.hollowcube.mql.runtime;
+package net.hollowcube.mql.builtin;
 
 import net.hollowcube.mql.foreign.Query;
 

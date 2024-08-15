@@ -1,4 +1,4 @@
-package net.hollowcube.mql.tree;
+package net.hollowcube.mql.internal.tree;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

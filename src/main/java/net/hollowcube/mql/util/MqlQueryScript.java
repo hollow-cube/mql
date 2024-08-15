@@ -1,4 +1,7 @@
-package net.hollowcube.mql.jit;
+package net.hollowcube.mql.util;
+
+import net.hollowcube.mql.foreign.MqlEnv;
+import net.hollowcube.mql.jit.MqlCompiler;
 
 /**
  * An example MQL script interface. May be used if only a query object is required, otherwise serves as documentation.

@@ -1,4 +1,4 @@
-package net.hollowcube.mql.tree;
+package net.hollowcube.mql.internal.tree;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -14,5 +14,5 @@ public record MqlArgListExpr(@NotNull List<MqlExpr> args) implements MqlExpr {
     public int size() {
         return args().size();
     }
-    
+
 }
