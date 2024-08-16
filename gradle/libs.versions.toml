@@ -3,7 +3,7 @@ metadata.format.version = "1.1"
 [versions]
 
 jetbrainsAnnotations = "23.0.0"
-asm = "9.4"
+asm = "9.7"
 
 nexuspublish = "1.3.0"
 

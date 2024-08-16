@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Supplier;
 
-public interface MqlCompiler {
+public sealed interface MqlCompiler permits MqlCompilerImpl {
 
     /**
      * <p>Compiles a one-off script with no extra context. The builtin math library will always be present in addition
@@ -50,14 +50,14 @@ public interface MqlCompiler {
 
     /**
      * Adds an initializer block to the module. This block will be executed when the module is instantiated. It is
-     * generally used for initializing variables, and does not have access to any declared context objects.
+     * generally used for initializing variables, and does not have target to any declared context objects.
      *
      * @param text The script text to evaluate.
      */
     void addInitializer(@NotNull String text);
 
     /**
-     * Adds a script to the module. The script will have access to the query objects in its environment. The returned
+     * Adds a script to the module. The script will have target to the query objects in its environment. The returned
      * script ref can be used to eval the script on an instance of the module after it has been compiled.
      *
      * @param spec The script interface to implement.
@@ -80,7 +80,7 @@ public interface MqlCompiler {
      *
      * @param <T> The script interface implemented by the script.
      */
-    interface Unit<T> {
+    sealed interface Unit<T> permits MqlCompilerImpl.UnitImpl {
         @NotNull Class<T> type();
     }
 

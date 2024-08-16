@@ -78,7 +78,7 @@ public class MqlParser {
             lhs = switch (op) {
                 case MEMBER_ACCESS -> {
                     if (!(rhs instanceof MqlIdentExpr ident))
-                        throw new MqlParseError("rhs of member access must be an ident, was " + rhs);
+                        throw new MqlParseError("rhs of member target must be an ident, was " + rhs);
                     yield new MqlAccessExpr(lhs, ident.value());
                 }
                 default -> new MqlBinaryExpr(op.op, lhs, rhs);

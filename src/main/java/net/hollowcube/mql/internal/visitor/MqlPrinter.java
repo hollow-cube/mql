@@ -1,4 +1,4 @@
-package net.hollowcube.mql.internal;
+package net.hollowcube.mql.internal.visitor;
 
 import net.hollowcube.mql.internal.tree.*;
 import org.jetbrains.annotations.NotNull;
@@ -74,7 +74,7 @@ public class MqlPrinter implements MqlVisitor<Void, String> {
     }
 
     @Override
-    public String visitTernaryExpr(MqlTernaryExpr expr, Void unused) {
+    public String visitTernaryExpr(@NotNull MqlTernaryExpr expr, Void unused) {
         var builder = new StringBuilder();
         builder.append("(? ");
         builder.append(visit(expr.condition(), null));
@@ -89,10 +89,10 @@ public class MqlPrinter implements MqlVisitor<Void, String> {
     }
 
     @Override
-    public String visitCallExpr(MqlCallExpr expr, Void unused) {
+    public String visitCallExpr(@NotNull MqlCallExpr expr, Void unused) {
         return String.format(
                 "(C %s %s)",
-                visit(expr.access(), null),
+                visit(expr.target(), null),
                 visit(expr.argList(), null)
         );
     }

@@ -34,9 +34,10 @@ public final class MqlRuntime {
     }
 
     public static <T> @NotNull T getScript(int instanceIndex, Object[] scripts, @NotNull MqlCompiler.Unit<T> unit) {
-        if (ref.moduleIndex() != instanceIndex)
-            throw new IllegalArgumentException("ScriptRef is from a different module instance.");
-        return unit.type().cast(scripts[ref.scriptIndex()]);
+//        if (ref.moduleIndex() != instanceIndex)
+//            throw new IllegalArgumentException("ScriptRef is from a different module instance.");
+//        return unit.type().cast(scripts[ref.scriptIndex()]);
+        throw new UnsupportedOperationException("todo");
     }
 
 }

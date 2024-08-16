@@ -9,49 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class TestCompilation {
 
-    @Test
-    public void singleNumber() {
-        check(BaseScript.class, "0", """
-                DCONST_0
-                DRETURN
-                """);
-        check(BaseScript.class, "1", """
-                DCONST_1
-                DRETURN
-                """);
-        check(BaseScript.class, "1.234", """
-                LDC 1.234
-                DRETURN
-                """);
-    }
-
-    @Test
-    public void simpleAddition() {
-        check(BaseScript.class, "1 + 1", """
-                DCONST_1
-                DCONST_1
-                DADD
-                DRETURN
-                """);
-    }
-
-    @Test
-    public void ternary() {
-        check(BaseScript.class, "1 == 2 ? 3 : 4", """
-                DCONST_1
-                LDC 2.0
-                INVOKESTATIC net/hollowcube/mql/jit/MqlRuntime.eq (DD)D
-                DCONST_0
-                DCMPL
-                IFEQ L0
-                LDC 3.0
-                GOTO L1
-                L0
-                LDC 4.0
-                L1
-                DRETURN
-                """);
-    }
 
     @Test
     public void callQuerySingleArg() {

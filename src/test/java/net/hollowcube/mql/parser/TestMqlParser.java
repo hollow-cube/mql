@@ -1,6 +1,6 @@
 package net.hollowcube.mql.parser;
 
-import net.hollowcube.mql.internal.MqlPrinter;
+import net.hollowcube.mql.internal.visitor.MqlPrinter;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -38,9 +38,9 @@ public class TestMqlParser {
                         "---1", "(- (- (- 1.0)))"),
                 Arguments.of("negate precedence",
                         "-2 + 1", "(+ (- 2.0) 1.0)"),
-                Arguments.of("basic access",
+                Arguments.of("basic target",
                         "a.b", "(. a b)"),
-                Arguments.of("access/add precedence",
+                Arguments.of("target/add precedence",
                         "a.b + 1", "(+ (. a b) 1.0)"),
                 Arguments.of("null coalesce precedence",
                         "a.b ?? 1", "(?? (. a b) 1.0)"),

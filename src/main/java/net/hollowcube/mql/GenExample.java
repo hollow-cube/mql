@@ -16,7 +16,11 @@ public class GenExample implements MqlModule.Instance {
 
     GenExample() {
         {   // Initializer 1
+            double x = 0;
+            double y = 0;
             //...
+
+            System.out.println(x + y);
         }
         {   // Initializer 2
             //...

@@ -1,11 +1,11 @@
 package net.hollowcube.mql.jit;
 
+import net.hollowcube.mql.builtin.MqlMath;
 import net.hollowcube.mql.foreign.MqlEnv;
 import net.hollowcube.mql.foreign.Query;
 import net.hollowcube.mql.internal.MqlRuntime;
 import net.hollowcube.mql.internal.tree.*;
 import net.hollowcube.mql.parser.MqlParser;
-import net.hollowcube.mql.builtin.MqlMath;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
 import org.objectweb.asm.ClassVisitor;
@@ -147,9 +147,9 @@ public class MqlCompiler<T> {
         }
 
         @Override
-        public Void visitCallExpr(MqlCallExpr expr, Void unused) {
-            if (!(expr.access() instanceof MqlAccessExpr access))
-                throw new UnsupportedOperationException("non-access queries are not supported");
+        public Void visitCallExpr(@NotNull MqlCallExpr expr, Void unused) {
+            if (!(expr.target() instanceof MqlAccessExpr access))
+                throw new UnsupportedOperationException("non-target queries are not supported");
             if (!(access.lhs() instanceof MqlIdentExpr ident))
                 throw new UnsupportedOperationException("Nested queries are not supported");
 
@@ -224,7 +224,7 @@ public class MqlCompiler<T> {
         }
 
         @Override
-        public Void visitTernaryExpr(MqlTernaryExpr expr, Void unused) {
+        public Void visitTernaryExpr(@NotNull MqlTernaryExpr expr, Void unused) {
 
             Label falseJump = new Label(), endJump = new Label();
 
