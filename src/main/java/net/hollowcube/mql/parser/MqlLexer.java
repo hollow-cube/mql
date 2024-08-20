@@ -30,6 +30,8 @@ public class MqlLexer {
             return ident();
         if (isDigit(c))
             return number();
+        if (c == '\'')
+            return string();
 
         return symbol(c);
     }
@@ -89,6 +91,18 @@ public class MqlLexer {
         return new MqlToken(MqlToken.Type.NUMBER, start, cursor);
     }
 
+    private MqlToken string() {
+        while (peek0() != '\'') {
+            if (peek0() == '\n')
+                throw new MqlParseError("unterminated string literal");
+            if (atEnd())
+                throw new MqlParseError("unexpected end of input");
+            advance();
+        }
+        advance(); // Consume the closing quote.
+        return new MqlToken(MqlToken.Type.STRING, start, cursor);
+    }
+
     private MqlToken symbol(char c) {
         var tokenType = switch (c) {
             // @formatter:off
@@ -129,9 +143,9 @@ public class MqlLexer {
             }
             case '=' -> {
                 if (match('=')) {
-                    yield MqlToken.Type.EQ;
+                    yield MqlToken.Type.EQEQ;
                 } else {
-                    throw new MqlParseError(String.format("unexpected token '%s' at %d.", c, cursor));
+                    yield MqlToken.Type.EQ;
                 }
             }
             case '!' -> {

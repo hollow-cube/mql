@@ -9,13 +9,22 @@ import java.util.List;
 
 public class MqlParser {
     private final MqlLexer lexer;
+    private final boolean isSimpleExpr;
 
-    public MqlParser(@NotNull String source) {
+    public MqlParser(@NotNull String source, boolean isSimpleExpr) {
         this.lexer = new MqlLexer(source);
+        this.isSimpleExpr = isSimpleExpr;
     }
 
     public @NotNull MqlExpr parse() {
-        return expr(0);
+        if (isSimpleExpr) {
+            return expr(0);
+        }
+
+        var exprs = exprList();
+        if (lexer.peek() != null) // We should always be at EOF.
+            throw new MqlParseError("unexpected token " + lexer.peek());
+        return new MqlBlockExpr(exprs);
     }
 
     private @NotNull MqlExpr expr(int minBindingPower) {
@@ -62,7 +71,7 @@ public class MqlParser {
                         lexer.expect(MqlToken.Type.RBRACK);
                         yield new MqlIndexExpr(lhs, target);
                     }
-                    default -> throw new IllegalStateException("Unexpected value: " + op);
+                    default -> throw new IllegalStateException("Unexpected rhs: " + op);
                 };
 
                 continue;
@@ -76,6 +85,11 @@ public class MqlParser {
             // Parse right side expression
             MqlExpr rhs = expr(op.rbp);
             lhs = switch (op) {
+                case ASSIGN -> {
+                    if (!(lhs instanceof MqlAccessExpr target))
+                        throw new MqlParseError("left side of assignment must be a variable access, was " + lhs);
+                    yield new MqlAssignExpr(target, rhs);
+                }
                 case MEMBER_ACCESS -> {
                     if (!(rhs instanceof MqlIdentExpr ident))
                         throw new MqlParseError("rhs of member target must be an ident, was " + rhs);
@@ -97,6 +111,10 @@ public class MqlParser {
 
         return switch (token.type()) {
             case NUMBER -> new MqlNumberExpr(Double.parseDouble(lexer.span(token)));
+            case STRING -> {
+                final String quotedValue = lexer.span(token);
+                yield new MqlStringExpr(quotedValue.substring(1, quotedValue.length() - 1));
+            }
             case IDENT -> {
                 var span = lexer.span(token);
                 yield switch (span) {
@@ -122,21 +140,31 @@ public class MqlParser {
                 yield expr;
             }
             case LBRACE -> {
-                var exprs = new ArrayList<MqlExpr>();
-                var next = lexer.peek();
-                if (next == null) throw new MqlParseError("unexpected end of input");
-                while (next.type() != MqlToken.Type.RBRACE) {
-                    exprs.add(expr(0));
-                    lexer.expect(MqlToken.Type.SEMICOLON);
-                    next = lexer.peek();
-                    if (next == null) throw new MqlParseError("unexpected end of input");
-                }
+                var exprs = exprList();
                 lexer.expect(MqlToken.Type.RBRACE);
                 yield new MqlBlockExpr(exprs);
             }
             //todo better error handling
             default -> throw new MqlParseError("unexpected token " + token);
         };
+    }
+
+    private @NotNull List<MqlExpr> exprList() {
+        var exprs = new ArrayList<MqlExpr>();
+        MqlToken next = lexer.peek();
+        while (next != null && next.type() != MqlToken.Type.RBRACE) {
+            exprs.add(expr(0));
+
+            // There should be a semicolon here, although if this was the last expression then its valid
+            // to exclude the semicolon. Note however that this does NOT behave as an implicit return as
+            // in some languages like Rust.
+            next = lexer.peek();
+            if (next != null && next.type() != MqlToken.Type.RBRACE) {
+                lexer.expect(MqlToken.Type.SEMICOLON);
+                next = lexer.peek();
+            }
+        }
+        return exprs;
     }
 
     private @Nullable Operator operator() {
@@ -156,13 +184,19 @@ public class MqlParser {
             case GE -> Operator.GE;
             case LTE -> Operator.LTE;
             case LE -> Operator.LE;
-            case EQ -> Operator.EQ;
+            case EQEQ -> Operator.EQ;
             case NEQ -> Operator.NEQ;
+            case EQ -> Operator.ASSIGN;
             default -> null;
         };
     }
 
     private enum Operator {
+        // Note that we do higher on left first because in this case we want to
+        // left associate the operator. That means that a chained assignment
+        // like t.x = t.y = 5 will evaluate `t.x = (t.y = 5)` instead of `(t.x = t.y) = 5`
+        ASSIGN(4, 3, null),
+
         NULL_COALESCE(5, 6, MqlBinaryExpr.Op.NULL_COALESCE),
         PLUS(25, 26, MqlBinaryExpr.Op.PLUS),
         MINUS(25, 26, MqlBinaryExpr.Op.MINUS),

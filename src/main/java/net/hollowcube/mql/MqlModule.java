@@ -25,7 +25,7 @@ public sealed interface MqlModule permits MqlModuleImpl, MqlModuleImpl.Error {
 
         /**
          * Gets the given callable script from this module instance. Multiple calls to this method with the same ref
-         * will return the same value for the lifetime of this instance.
+         * will return the same rhs for the lifetime of this instance.
          *
          * @param ref The script ref to get.
          * @param <T> The script interface.

@@ -64,7 +64,7 @@ public class MqlCompiler<T> {
     public byte[] compileBytecode(String className, String script) {
 
         // Parse to an expression tree
-        MqlExpr expr = new MqlParser(script).parse();
+        MqlExpr expr = new MqlParser(script, true).parse();
 
         // Create the class
         ClassWriter scriptClass = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);

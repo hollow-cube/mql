@@ -7,21 +7,27 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Set;
 
-public class VariableExtractionVisitor implements MqlVisitor<@NotNull Set<String>, Void> {
-    public static final VariableExtractionVisitor INSTANCE = new VariableExtractionVisitor();
+public class VariableExtractionVisitor implements MqlVisitor<Void, Void> {
+    public static final Set<String> VARIABLE_NAMES = Set.of("v", "variable");
+    public static final Set<String> LOCAL_NAMES = Set.of("t", "temp");
 
-    private static final Set<String> VARIABLE_NAMES = Set.of("v", "variable");
+    private final Set<String> variables;
+    private final Set<String> locals;
 
-    private VariableExtractionVisitor() {
+    public VariableExtractionVisitor(Set<String> variables, Set<String> locals) {
+        this.variables = variables;
+        this.locals = locals;
     }
 
     // We only care about accesses which target v.xyz or variable.xyz. xyz would be the relevant variable
     @Override
-    public Void visitAccessExpr(@NotNull MqlAccessExpr expr, @NotNull Set<String> strings) {
-        if (expr.lhs() instanceof MqlIdentExpr ident && VARIABLE_NAMES.contains(ident.value())) {
-            strings.add(ident.value());
+    public Void visitAccessExpr(@NotNull MqlAccessExpr expr, Void v) {
+        if (expr.lhs() instanceof MqlIdentExpr ident) {
+            if (VARIABLE_NAMES.contains(ident.value()))
+                variables.add(ident.value());
+            else if (LOCAL_NAMES.contains(ident.value()))
+                locals.add(ident.value());
         }
-        return MqlVisitor.super.visitAccessExpr(expr, strings);
+        return MqlVisitor.super.visitAccessExpr(expr, v);
     }
-
 }

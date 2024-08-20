@@ -1,5 +1,6 @@
 package net.hollowcube.mql.internal;
 
+import net.hollowcube.mql.builtin.MqlMath;
 import net.hollowcube.mql.internal.tree.MqlExpr;
 import net.hollowcube.mql.internal.visitor.BytecodeGenerator;
 import net.hollowcube.mql.internal.visitor.VariableExtractionVisitor;
@@ -13,10 +14,7 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -26,20 +24,29 @@ public class MqlCodeBuilder {
 
     private final List<String> errors = new ArrayList<>(); // Accumulated as we go.
 
+    private final Map<String, Class<?>> libraries = new HashMap<>();
+
     private final Set<String> variables = new HashSet<>();
     private final List<Code> initializers = new ArrayList<>();
     private final List<Code> scripts = new ArrayList<>();
 
-    record Code(@NotNull String debugName, @UnknownNullability Class<?> scriptInterface,
-                @NotNull MqlExpr code, @NotNull List<String> locals) {
+    record Code(@NotNull String debugName, @UnknownNullability Class<?> scriptInterface, @NotNull MqlExpr code,
+                @NotNull List<String> locals, @NotNull Map<String, Class<?>> contextObjects) {
     }
 
-    public void addInitializer(@NotNull String text) {
-        var code = parseText(text);
+    public MqlCodeBuilder() {
+        libraries.put("math", MqlMath.class);
+        libraries.put("m", MqlMath.class);
+    }
+
+    public void addInitializer(@NotNull String text, @Nullable String debugName) {
+        var code = parseText(text, false);
         if (code == null) return; // Error was accumulated
 
-        collectVariables(code);
-        this.initializers.add(new Code("todo", null, code, new ArrayList<>()));
+        var locals = collectVariables(code);
+
+        var codeName = Objects.requireNonNullElseGet(debugName, () -> String.valueOf(text.hashCode()));
+        this.initializers.add(new Code(codeName, null, code, new ArrayList<>(), Map.copyOf(libraries)));
     }
 
     public @Nullable Class<?> lower() {
@@ -64,18 +71,24 @@ public class MqlCodeBuilder {
 
     }
 
-    private @Nullable MqlExpr parseText(@NotNull String text) {
+    private @Nullable MqlExpr parseText(@NotNull String text, boolean isSimpleExpr) {
         try {
-            return new MqlParser(text).parse();
+            return new MqlParser(text, isSimpleExpr).parse();
         } catch (MqlParseError e) {
             this.errors.add(e.getMessage());
             return null;
         }
     }
 
-    private void collectVariables(@NotNull MqlExpr expr) {
+    /**
+     * Collects all variables usages and locals, returning the locals. The variables set is updated with the
+     * non-local variables found.
+     */
+    private @NotNull List<String> collectVariables(@NotNull MqlExpr expr) {
         // Look for references to variables and accumulate them in the variables set.
-        expr.visit(VariableExtractionVisitor.INSTANCE, this.variables);
+        var locals = new HashSet<String>();
+        expr.visit(new VariableExtractionVisitor(variables, locals), null);
+        return locals.isEmpty() ? List.of() : List.copyOf(locals);
     }
 
     // Implements the case where there is only one script so we only need one class.
@@ -112,11 +125,13 @@ public class MqlCodeBuilder {
 
         // Create the local variables
         for (int i = 0; i < code.locals.size(); i++) {
-            mv.visitLocalVariable(code.locals.get(i), "D", null, startLabel, endLabel, i);
+            mv.visitLocalVariable(code.locals.get(i), "D", null,
+                    // Always start at 1 because 0 is reserved for "this"
+                    startLabel, endLabel, i + 1);
         }
 
         // Evaluate the code
-        new BytecodeGenerator(mv).visit(code.code, code.locals);
+        new BytecodeGenerator(mv, code.contextObjects).visit(code.code, code.locals);
 
         mv.visitLabel(endLabel);
     }

@@ -46,7 +46,9 @@ public class TestMqlLexer {
 
                 Arguments.of("abc", MqlToken.Type.IDENT),
                 Arguments.of("aBc", MqlToken.Type.IDENT),
-                Arguments.of("aBc1", MqlToken.Type.IDENT)
+                Arguments.of("aBc1", MqlToken.Type.IDENT),
+                Arguments.of("'hello'", MqlToken.Type.STRING),
+                Arguments.of("''", MqlToken.Type.STRING)
         );
     }
 

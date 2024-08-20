@@ -17,15 +17,17 @@ public sealed interface MqlCompiler permits MqlCompilerImpl {
      * <p>This function is a shorthand for the rest of this api, the implementation may provide some hints for
      * more advanced usage.</p>
      *
-     * @param t    The script interface to implement.
-     * @param text The script text to evaluate.
-     * @param <T>  The script interface to implement.
+     * @param t            The script interface to implement.
+     * @param text         The script text to evaluate.
+     * @param isSimpleExpr True if the script is a simple expression (one expression, no ;), false for a complex
+     *                     block which requires ; as well as a return statement to return a rhs.
+     * @param <T>          The script interface to implement.
      * @return A supplier that will instantiate the script when called.
      * @throws MqlCompileError If there are errors in the script.
      */
-    static <T> @NotNull Supplier<T> compile(@NotNull Class<T> t, @NotNull String text) {
+    static <T> @NotNull Supplier<T> compile(@NotNull Class<T> t, @NotNull String text, boolean isSimpleExpr) {
         var compiler = create();
-        var ref = compiler.addScript(t, text);
+        var ref = compiler.addScript(t, text, isSimpleExpr);
         var module = compiler.compile();
         if (!module.isValid()) throw new MqlCompileError(module.errors());
         return () -> module.newInstance().getScript(ref);
@@ -60,12 +62,14 @@ public sealed interface MqlCompiler permits MqlCompilerImpl {
      * Adds a script to the module. The script will have target to the query objects in its environment. The returned
      * script ref can be used to eval the script on an instance of the module after it has been compiled.
      *
-     * @param spec The script interface to implement.
-     * @param text The script text to evaluate.
-     * @param <T>  The script interface to implement.
+     * @param spec         The script interface to implement.
+     * @param text         The script text to evaluate.
+     * @param isSimpleExpr True if the script is a simple expression (one expression, no ;), false for a complex
+     *                     block which requires ; as well as a return statement to return a rhs.
+     * @param <T>          The script interface to implement.
      * @return The compilation unit.
      */
-    <T> @NotNull Unit<T> addScript(@NotNull Class<T> spec, @NotNull String text);
+    <T> @NotNull Unit<T> addScript(@NotNull Class<T> spec, @NotNull String text, boolean isSimpleExpr);
 
     /**
      * <p>Compile the module and return it. Compilation errors will not be thrown, you should inspect

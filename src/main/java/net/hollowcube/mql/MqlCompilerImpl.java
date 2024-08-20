@@ -23,7 +23,7 @@ final class MqlCompilerImpl implements MqlCompiler {
     }
 
     @Override
-    public @NotNull <T> Unit<T> addScript(@NotNull Class<T> spec, @NotNull String text) {
+    public @NotNull <T> Unit<T> addScript(@NotNull Class<T> spec, @NotNull String text, boolean isSimpleExpr) {
         return null;
     }
 

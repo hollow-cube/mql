@@ -53,6 +53,11 @@ public class MqlPrinter implements MqlVisitor<Void, String> {
     }
 
     @Override
+    public String visitStringExpr(MqlStringExpr expr, Void unused) {
+        return "'" + expr.value() + "'";
+    }
+
+    @Override
     public String visitRefExpr(@NotNull MqlIdentExpr expr, Void unused) {
         return expr.value();
     }
@@ -136,6 +141,15 @@ public class MqlPrinter implements MqlVisitor<Void, String> {
         }
         builder.append("}");
         return builder.toString();
+    }
+
+    @Override
+    public String visitAssignExpr(MqlAssignExpr mqlAssignExpr, Void unused) {
+        return String.format(
+                "(= %s %s)",
+                visit(mqlAssignExpr.target(), null),
+                visit(mqlAssignExpr.rhs(), null)
+        );
     }
 
     @Override

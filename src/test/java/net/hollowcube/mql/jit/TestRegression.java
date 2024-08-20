@@ -77,7 +77,7 @@ public class TestRegression {
 
 
     private void parse(String input, String expected) {
-        var expr = new MqlParser(input).parse();
+        var expr = new MqlParser(input, true).parse();
         var actual = new MqlPrinter().visit(expr, null);
 
         assertEquals(expected, actual);

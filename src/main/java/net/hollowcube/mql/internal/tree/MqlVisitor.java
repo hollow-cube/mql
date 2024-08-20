@@ -25,6 +25,10 @@ public interface MqlVisitor<P, R> {
         return defaultValue();
     }
 
+    default R visitStringExpr(MqlStringExpr expr, P p) {
+        return defaultValue();
+    }
+
     default R visitRefExpr(@NotNull MqlIdentExpr expr, P p) {
         return defaultValue();
     }
@@ -74,6 +78,12 @@ public interface MqlVisitor<P, R> {
 
     default R visitReturnExpr(@NotNull MqlReturnExpr expr, P p) {
         if (expr.value() != null) visit(expr.value(), p);
+        return defaultValue();
+    }
+
+    default R visitAssignExpr(MqlAssignExpr expr, P p) {
+        visit(expr.target(), p);
+        visit(expr.rhs(), p);
         return defaultValue();
     }
 

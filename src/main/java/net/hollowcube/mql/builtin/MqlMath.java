@@ -10,7 +10,7 @@ public class MqlMath {
     }
 
     /**
-     * Absolute value of value
+     * Absolute rhs of rhs
      */
     @Query
     public static double abs(double value) {
@@ -18,7 +18,7 @@ public class MqlMath {
     }
 
     /**
-     * arccos of value
+     * arccos of rhs
      */
     @Query
     public static double acos(double value) {
@@ -26,7 +26,7 @@ public class MqlMath {
     }
 
     /**
-     * arcsin of value
+     * arcsin of rhs
      */
     @Query
     public static double asin(double value) {
@@ -34,7 +34,7 @@ public class MqlMath {
     }
 
     /**
-     * arctan of value
+     * arctan of rhs
      */
     @Query
     public static double atan(double value) {
@@ -50,7 +50,7 @@ public class MqlMath {
     }
 
     /**
-     * Round value up to nearest integral number
+     * Round rhs up to nearest integral number
      */
     @Query
     public static double ceil(double value) {
@@ -58,7 +58,7 @@ public class MqlMath {
     }
 
     /**
-     * Clamp value to between min and max inclusive
+     * Clamp rhs to between min and max inclusive
      */
     @Query
     public static double clamp(double value, double min, double max) {
@@ -66,7 +66,7 @@ public class MqlMath {
     }
 
     /**
-     * Cosine (in degrees) of value
+     * Cosine (in degrees) of rhs
      */
     @Query
     public static double cos(double value) {
@@ -74,7 +74,7 @@ public class MqlMath {
     }
 
     /**
-     * Returns the sum of 'num' random numbers, each with a value from low to high. Note: the generated random numbers are not integers like normal dice. For that, use math.die_roll_integer.
+     * Returns the sum of 'num' random numbers, each with a rhs from low to high. Note: the generated random numbers are not integers like normal dice. For that, use math.die_roll_integer.
      */
     @Query
     public static double dieRoll(double num, double low, double high) {
@@ -85,7 +85,7 @@ public class MqlMath {
     }
 
     /**
-     * Returns the sum of 'num' random integer numbers, each with a value from low to high. Note: the generated random numbers are integers like normal dice.
+     * Returns the sum of 'num' random integer numbers, each with a rhs from low to high. Note: the generated random numbers are integers like normal dice.
      */
     @Query
     public static double dieRollInteger(double num, double low, double high) {
@@ -96,7 +96,7 @@ public class MqlMath {
     }
 
     /**
-     * Calculates e to the value 'nth' power
+     * Calculates e to the rhs 'nth' power
      */
     @Query
     public static double exp(double value) {
@@ -104,7 +104,7 @@ public class MqlMath {
     }
 
     /**
-     * Round value down to nearest integral number
+     * Round rhs down to nearest integral number
      */
     @Query
     public static double floor(double value) {
@@ -144,7 +144,7 @@ public class MqlMath {
     }
 
     /**
-     * Natural logarithm of value
+     * Natural logarithm of rhs
      */
     @Query
     public static double ln(double value) {
@@ -152,7 +152,7 @@ public class MqlMath {
     }
 
     /**
-     * Return highest value of A or B
+     * Return highest rhs of A or B
      */
     @Query
     public static double max(double a, double b) {
@@ -160,7 +160,7 @@ public class MqlMath {
     }
 
     /**
-     * Return lowest value of A or B
+     * Return lowest rhs of A or B
      */
     @Query
     public static double min(double a, double b) {
@@ -177,7 +177,7 @@ public class MqlMath {
     }
 
     /**
-     * Return the remainder of value / denominator
+     * Return the remainder of rhs / denominator
      */
     @Query
     public static double mod(double value, double denominator) {
@@ -201,7 +201,7 @@ public class MqlMath {
     }
 
     /**
-     * Random value between low (inclusive) and high (exclusive)
+     * Random rhs between low (inclusive) and high (exclusive)
      * <p>
      * Note: The original molang spec says that the range is inclusive, but this high end is exclusive.
      */
@@ -211,7 +211,7 @@ public class MqlMath {
     }
 
     /**
-     * Random integer value between low and high (inclusive)
+     * Random integer rhs between low and high (inclusive)
      */
     @Query
     public static double randomInteger(double low, double high) {
@@ -219,7 +219,7 @@ public class MqlMath {
     }
 
     /**
-     * Round value to nearest integral number
+     * Round rhs to nearest integral number
      */
     @Query
     public static double round(double value) {
@@ -227,7 +227,7 @@ public class MqlMath {
     }
 
     /**
-     * Sine (in degrees) of value
+     * Sine (in degrees) of rhs
      */
     @Query
     public static double sin(double value) {
@@ -235,7 +235,7 @@ public class MqlMath {
     }
 
     /**
-     * Square root of value
+     * Square root of rhs
      */
     @Query
     public static double sqrt(double value) {
@@ -243,7 +243,7 @@ public class MqlMath {
     }
 
     /**
-     * Round value towards zero
+     * Round rhs towards zero
      */
     @Query
     public static double trunc(double value) {
