@@ -24,9 +24,9 @@ public class VariableExtractionVisitor implements MqlVisitor<Void, Void> {
     public Void visitAccessExpr(@NotNull MqlAccessExpr expr, Void v) {
         if (expr.lhs() instanceof MqlIdentExpr ident) {
             if (VARIABLE_NAMES.contains(ident.value()))
-                variables.add(ident.value());
+                variables.add(expr.target());
             else if (LOCAL_NAMES.contains(ident.value()))
-                locals.add(ident.value());
+                locals.add(expr.target());
         }
         return MqlVisitor.super.visitAccessExpr(expr, v);
     }

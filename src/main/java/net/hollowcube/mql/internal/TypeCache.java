@@ -4,16 +4,23 @@ import net.hollowcube.mql.internal.tree.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class TypeCache {
-    private static final TypeCheckingVisitor VISITOR = new TypeCheckingVisitor();
 
     // We map expr trees to their types. Once a tree has been computed it is final.
     private final Map<MqlExpr, MqlType> cache = new HashMap<>();
+    private final TypeCheckingVisitor visitor = new TypeCheckingVisitor();
+
+    private final Map<String, Class<?>> contextObjects;
+
+    public TypeCache(@NotNull Map<String, Class<?>> contextObjects) {
+        this.contextObjects = contextObjects;
+    }
 
     public @NotNull MqlType getType(@NotNull MqlExpr expr) {
-        return cache.computeIfAbsent(expr, e -> e.visit(VISITOR, this));
+        return cache.computeIfAbsent(expr, e -> e.visit(visitor, this));
     }
 
     // Note: There is a slightly odd back and forth here going on here with the cache
@@ -23,7 +30,8 @@ public class TypeCache {
     // In the visitor impls we use `visit` to call the next node in the tree, which
     // directs it to the cache again to avoid recomputing large trees.
 
-    private static class TypeCheckingVisitor implements MqlVisitor<TypeCache, MqlType> {
+    private class TypeCheckingVisitor implements MqlVisitor<TypeCache, MqlType> {
+        private static final List<MqlType> STRING_OR_NUMBER = List.of(MqlType.STRING, MqlType.NUMBER);
 
         @Override
         public MqlType visit(@NotNull MqlExpr expr, TypeCache typeCache) {
@@ -44,7 +52,28 @@ public class TypeCache {
 
         @Override
         public MqlType visitBinaryExpr(@NotNull MqlBinaryExpr expr, TypeCache typeCache) {
-            return MqlVisitor.super.visitBinaryExpr(expr, typeCache);
+            var lhsType = visit(expr.lhs(), typeCache);
+            var rhsType = visit(expr.rhs(), typeCache);
+
+            return switch (expr.operator()) {
+                case PLUS, MINUS, DIV, MUL, GTE, GE, LTE, LE -> {
+                    assertType(MqlType.NUMBER, lhsType);
+                    assertType(MqlType.NUMBER, rhsType);
+                    // For GTE, GE, LTE, LE this number is 1 or 0.
+                    yield MqlType.NUMBER;
+                }
+                case EQ, NEQ -> {
+                    // Both must be a string or number
+                    assertType(STRING_OR_NUMBER, lhsType);
+                    // Both must be the same type
+                    assertType(lhsType, rhsType, String.format("Expected same types: %s != %s", lhsType, rhsType));
+                    yield MqlType.NUMBER; // 1 or 0
+                }
+                case NULL_COALESCE -> {
+                    assertType(lhsType, rhsType, String.format("Expected same types: %s != %s", lhsType, rhsType));
+                    yield lhsType;
+                }
+            };
         }
 
         @Override
@@ -90,12 +119,13 @@ public class TypeCache {
 
         @Override
         public MqlType visitBlockExpr(@NotNull MqlBlockExpr expr, TypeCache typeCache) {
-            return MqlVisitor.super.visitBlockExpr(expr, typeCache);
+            // TODO: Probably not correct.
+            return MqlType.NUMBER;
         }
 
         @Override
         public MqlType visitIndexExpr(@NotNull MqlIndexExpr expr, TypeCache typeCache) {
-            return MqlVisitor.super.visitIndexExpr(expr, typeCache);
+            throw new UnsupportedOperationException("not implemented");
         }
 
         @Override
@@ -115,7 +145,7 @@ public class TypeCache {
 
         @Override
         public MqlType visitReturnExpr(@NotNull MqlReturnExpr expr, TypeCache typeCache) {
-            throw new UnsupportedOperationException("not implemented");
+            throw new UnsupportedOperationException("unreachable");
         }
 
         @Override
@@ -124,8 +154,18 @@ public class TypeCache {
         }
 
         private static void assertType(@NotNull MqlType expected, @NotNull MqlType actual) {
+            assertType(expected, actual, "Expected " + expected + ", got " + actual);
+        }
+
+        private static void assertType(@NotNull MqlType expected, @NotNull MqlType actual, @NotNull String message) {
             if (expected != actual) {
-                throw new UnsupportedOperationException("Expected " + expected + ", got " + actual);
+                throw new IllegalStateException(message);
+            }
+        }
+
+        private static void assertType(@NotNull List<MqlType> expected, @NotNull MqlType actual) {
+            if (!expected.contains(actual)) {
+                throw new IllegalStateException("Expected " + expected + ", got " + actual);
             }
         }
     }

@@ -1,5 +1,6 @@
 package net.hollowcube.mql.internal.visitor;
 
+import net.hollowcube.mql.builtin.MqlMath;
 import net.hollowcube.mql.jit.AsmUtil;
 import net.hollowcube.mql.parser.MqlParser;
 import org.jetbrains.annotations.NotNull;
@@ -53,10 +54,48 @@ public class TestBytecodeGenerator {
                 DCONST_1
                 DMUL
                 """);
-        assertCompilation("1 / 1", """
+    }
+
+    @Test
+    public void divideByZeroNoCoalesce() {
+        assertCompilation("1 / 0", """
                 DCONST_1
-                DCONST_1
+                DCONST_0
+                DUP
+                DCONST_0
+                DCMPL
+                IFNE L0
+                POP2
+                GETFIELD net/hollowcube/mql/TestBytecodeGenerator.contentError$Handler : Lnet/hollowcube/mql/ContentError$Handler;
+                NEW Lnet/hollowcube/mql/ContentError;
+                DUP
+                ICONST_0
+                LDC "Division by zero"
+                INVOKESPECIAL Lnet/hollowcube/mql/ContentError;.<init> (ILnet/hollowcube/mql/ContentError;)V
+                INVOKEINTERFACE Lnet/hollowcube/mql/ContentError$Handler;.handle (Lnet/hollowcube/mql/ContentError;)V (itf)
+                DCONST_0
+                GOTO L1
+                L0
                 DDIV
+                L1
+                """);
+    }
+
+    @Test
+    public void divideByZeroCoalesced() {
+        assertCompilation("(1 / 0) ?? 2", """
+                DCONST_1
+                DCONST_0
+                DUP
+                DCONST_0
+                DCMPL
+                IFNE L0
+                POP2
+                LDC 2.0
+                GOTO L1
+                L0
+                DDIV
+                L1
                 """);
     }
 
@@ -80,15 +119,21 @@ public class TestBytecodeGenerator {
         assertCompilation("1 == 2 ? 3 : 4", """
                 DCONST_1
                 LDC 2.0
-                INVOKESTATIC net/hollowcube/mql/internal/MqlRuntime.eq (DD)D
-                DCONST_0
                 DCMPL
                 IFEQ L0
-                LDC 3.0
+                DCONST_0
                 GOTO L1
                 L0
-                LDC 4.0
+                DCONST_1
                 L1
+                DCONST_0
+                DCMPL
+                IFEQ L2
+                LDC 3.0
+                GOTO L3
+                L2
+                LDC 4.0
+                L3
                 """);
     }
 
@@ -97,15 +142,21 @@ public class TestBytecodeGenerator {
         assertCompilation("1 == 2 ? 3", """
                 DCONST_1
                 LDC 2.0
-                INVOKESTATIC net/hollowcube/mql/internal/MqlRuntime.eq (DD)D
-                DCONST_0
                 DCMPL
                 IFEQ L0
-                LDC 3.0
+                DCONST_0
                 GOTO L1
                 L0
-                DCONST_0
+                DCONST_1
                 L1
+                DCONST_0
+                DCMPL
+                IFEQ L2
+                LDC 3.0
+                GOTO L3
+                L2
+                DCONST_0
+                L3
                 """);
     }
 
@@ -124,17 +175,82 @@ public class TestBytecodeGenerator {
                 """);
     }
 
+    @Test
+    public void returns() {
+        assertCompilation("return", """
+                DCONST_0
+                DRETURN
+                """);
+        assertCompilation("return 1.0", """
+                DCONST_1
+                DRETURN
+                """);
+    }
+
+    @Test
+    public void noArgsCall() {
+        assertCompilation("m.pi", """
+                INVOKESTATIC net/hollowcube/mql/builtin/MqlMath.pi ()D
+                """);
+    }
+
+    @Test
+    public void singleArgCall() {
+        assertCompilation("m.ln(5)", """
+                LDC 5.0
+                INVOKESTATIC net/hollowcube/mql/builtin/MqlMath.ln (D)D
+                """);
+    }
+
+    @Test
+    public void callContentErrorSource() {
+        assertCompilation("m.mod(5, 0)", """
+                LDC 5.0
+                DCONST_0
+                L0
+                INVOKESTATIC net/hollowcube/mql/builtin/MqlMath.mod (DD)D
+                GOTO L1
+                L2
+                GETFIELD net/hollowcube/mql/TestBytecodeGenerator.contentError$Handler : Lnet/hollowcube/mql/ContentError$Handler;
+                NEW Lnet/hollowcube/mql/ContentError;
+                DUP
+                ICONST_0
+                INVOKEVIRTUAL Lnet/hollowcube/mql/ContentError;.getMessage ()Ljava/lang/String;
+                INVOKESPECIAL Lnet/hollowcube/mql/ContentError;.<init> (ILnet/hollowcube/mql/ContentError;)V
+                INVOKEINTERFACE Lnet/hollowcube/mql/ContentError$Handler;.handle (Lnet/hollowcube/mql/ContentError;)V (itf)
+                DCONST_0
+                L1
+                """);
+    }
+
+    @Test
+    public void callContentErrorSourceWithCoalesce() {
+        assertCompilation("m.mod(5, 0) ?? 21", """
+                LDC 5.0
+                DCONST_0
+                L0
+                INVOKESTATIC net/hollowcube/mql/builtin/MqlMath.mod (DD)D
+                GOTO L1
+                L2
+                POP
+                LDC 21.0
+                L1
+                """);
+    }
+
     private void assertCompilation(@NotNull String source, @NotNull String expected) {
         assertCompilation(List.of(), source, expected);
     }
 
     private void assertCompilation(@NotNull List<String> locals, @NotNull String source, @NotNull String expected) {
         var cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        cw.visit(V21, ACC_PUBLIC, "net/hollowcube/mql/TestBytecodeGenerator", null, "java/lang/Object", null);
+        var className = "net/hollowcube/mql/TestBytecodeGenerator";
+        cw.visit(V21, ACC_PUBLIC, className, null, "java/lang/Object", null);
         var mv = cw.visitMethod(ACC_PUBLIC, "evaluate", "()D", null, null);
 
         var expr = new MqlParser(source, true).parse();
-        new BytecodeGenerator(mv, Map.of()).visit(expr, locals);
+        var mathContext = Map.<String, Class<?>>of("m", MqlMath.class, "math", MqlMath.class);
+        new BytecodeGenerator(className, mv, mathContext).visit(expr, locals);
 
         mv.visitEnd();
 

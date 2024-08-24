@@ -54,7 +54,9 @@ public interface MqlVisitor<P, R> {
     }
 
     default R visitBlockExpr(@NotNull MqlBlockExpr expr, P p) {
-        //todo!
+        for (var e : expr.exprs()) {
+            visit(e, p);
+        }
         return defaultValue();
     }
 

@@ -18,7 +18,20 @@ public final class AsmUtil {
     private AsmUtil() {
     }
 
+    public static @NotNull String methodDescriptor(@NotNull Class<?> returnType, @NotNull Class<?>... param) {
+        var sb = new StringBuilder("(");
+        for (var p : param) {
+            sb.append(toDescriptor(p));
+        }
+        sb.append(")");
+        sb.append(toDescriptor(returnType));
+        return sb.toString();
+    }
+
     public static @NotNull String toDescriptor(@NotNull Class<?> clazz) {
+        if (clazz.isArray()) {
+            return "[" + toDescriptor(clazz.getComponentType());
+        }
         if (boolean.class.equals(clazz)) {
             return "Z";
         } else if (byte.class.equals(clazz)) {

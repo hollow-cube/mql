@@ -1,5 +1,6 @@
 package net.hollowcube.mql.builtin;
 
+import net.hollowcube.mql.foreign.ContentErrorException;
 import net.hollowcube.mql.foreign.Query;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -180,7 +181,10 @@ public class MqlMath {
      * Return the remainder of rhs / denominator
      */
     @Query
-    public static double mod(double value, double denominator) {
+    public static double mod(double value, double denominator) throws ContentErrorException {
+        if (denominator == 0) {
+            throw new ContentErrorException("Division by zero");
+        }
         return value % denominator;
     }
 

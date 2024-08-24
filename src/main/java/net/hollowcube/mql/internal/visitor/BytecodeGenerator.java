@@ -1,28 +1,51 @@
 package net.hollowcube.mql.internal.visitor;
 
+import net.hollowcube.mql.ContentError;
 import net.hollowcube.mql.internal.ForeignFunction;
 import net.hollowcube.mql.internal.tree.*;
 import net.hollowcube.mql.jit.AsmUtil;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 import static net.hollowcube.mql.internal.visitor.VariableExtractionVisitor.LOCAL_NAMES;
+import static net.hollowcube.mql.jit.AsmUtil.methodDescriptor;
 import static org.objectweb.asm.Opcodes.*;
 
 public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
+    private static final String CONTENT_ERROR_DESC = AsmUtil.toDescriptor(ContentError.class);
+    private static final String CONTENT_ERROR_HANDLER_DESC = AsmUtil.toDescriptor(ContentError.Handler.class);
+
+    private static final String CONTENT_ERROR_HANDLER_NAME = "contentError$Handler";
+
+    private final String owningClass;
     private final MethodVisitor mv;
 
     private final Map<String, Class<?>> contextObjects;
 
-    public BytecodeGenerator(@NotNull MethodVisitor mv, @NotNull Map<String, Class<?>> contextObjects) {
+    private int depthIndex = 0;
+    private Map<Integer, Runnable> coalesceValues = new HashMap<>();
+
+    public BytecodeGenerator(@NotNull String owningClass, @NotNull MethodVisitor mv, @NotNull Map<String, Class<?>> contextObjects) {
+        this.owningClass = owningClass;
         this.mv = mv;
 
         this.contextObjects = contextObjects;
+    }
+
+    @Override
+    public Void visit(@NotNull MqlExpr expr, List<String> strings) {
+        depthIndex++;
+        MqlVisitor.super.visit(expr, strings);
+        depthIndex--;
+        return null;
     }
 
     @Override
@@ -56,6 +79,12 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
 
     @Override
     public Void visitBinaryExpr(@NotNull MqlBinaryExpr expr, @NotNull List<String> locals) {
+        // Null coalesce is a special case that needs to be handled separately.
+        if (expr.operator() == MqlBinaryExpr.Op.NULL_COALESCE) {
+            visitNullCoalesce(expr.lhs(), expr.rhs(), locals);
+            return null;
+        }
+
         // Visit both sides, resulting in two doubles on the stack
         visit(expr.lhs(), locals);
         visit(expr.rhs(), locals);
@@ -65,20 +94,7 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
             case PLUS -> mv.visitInsn(DADD);
             case MINUS -> mv.visitInsn(DSUB);
             case MUL -> mv.visitInsn(DMUL);
-            case DIV -> mv.visitInsn(DDIV);
-            case NULL_COALESCE -> {
-                /*
-                This behaves kinda weirdly in Molang, here is apparently the rules:
-
-                * ?? applies to the following:
-                    has not yet been initialized
-                    is a reference to a deleted entity
-                    is an invalid reference
-                    holds an error
-                Note that this requires we handle variables that have not been initialized. I think we can just use NaN or Inf
-                 */
-                throw new RuntimeException("Null coalesce operator not supported in JIT mode");
-            }
+            case DIV -> visitDivision();
             case GTE, GE, LTE, LE, EQ, NEQ -> {
                 // We need to compare the two values and push a boolean result.
                 // We can't use the normal comparison instructions because they don't work with NaN.
@@ -104,6 +120,48 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
         }
 
         return null;
+    }
+
+    private void visitDivision() {
+        // Divide is a little tricky. We need to check for division by zero and generate a content error.
+
+        // Duplicate the top value on the stack so we can compare it to zero.
+        mv.visitInsn(DUP);
+        mv.visitInsn(DCONST_0);
+        mv.visitInsn(DCMPL);
+        Label notZero = new Label(), end = new Label();
+        mv.visitJumpInsn(IFNE, notZero);
+
+        // If the divisor is zero, it is a content error.
+        mv.visitInsn(POP2); // Get rid of LHS and RHS
+        emitContentErrorOrCoalesce("Division by zero"); // Leaves 0 on stack
+        mv.visitJumpInsn(GOTO, end);
+
+        // If the divisor is not zero, we can safely divide.
+        mv.visitLabel(notZero);
+        mv.visitInsn(DDIV);
+        mv.visitLabel(end);
+    }
+
+    private void visitNullCoalesce(@NotNull MqlExpr lhs, @NotNull MqlExpr rhs, @NotNull List<String> locals) {
+        // Null Coalesce operators can apply to any of the following, converting
+        // it to the right-hand side expression:
+        //  * has not yet been initialized
+        //  * is a reference to a deleted entity
+        //  * is an invalid reference
+        //  * holds an error
+        // (though we dont currently support entities, so its really the first and last cases)
+        // Referencing an uninitialized variable always generates a content error, so this is even
+        // more generic to say that it just coalesces a content error into the RHS.
+
+        // Set up the default value supplier for the next expression (the LHS)
+        coalesceValues.put(depthIndex + 1, () -> visit(rhs, locals));
+
+        // Evaluate the LHS which can handle a content error using the above supplier.
+        visit(lhs, locals);
+
+        // Clean up
+        coalesceValues.remove(depthIndex + 1);
     }
 
     @Override
@@ -167,7 +225,7 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
         if (LOCAL_NAMES.contains(ident.value())) {
             int localIndex = locals.indexOf(expr.target().target());
             if (localIndex == -1) {
-                throw new UnsupportedOperationException("invalid local (" + ident.value() + ") in assignment");
+                throw new UnsupportedOperationException("invalid local (" + expr.target().target() + ") in assignment");
             }
 
             // Add 1 because 0 is always reserved for `this`.
@@ -191,7 +249,11 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
 
     @Override
     public Void visitBlockExpr(@NotNull MqlBlockExpr expr, List<String> strings) {
-        return MqlVisitor.super.visitBlockExpr(expr, strings);
+        for (var child : expr.exprs()) {
+            visit(child, strings);
+            mv.visitInsn(POP); // Pop the result of the expression
+        }
+        return null;
     }
 
     private void visitAnyCall(@NotNull String object, @NotNull String method, @NotNull List<MqlExpr> args) {
@@ -213,6 +275,38 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
             visit(args.get(i), null);
             //todo do type checking & correct conversion
             AsmUtil.convert(function.paramTypes()[i], double.class, mv);
+        }
+
+        // Setup try catch if the function is a content error source.
+        Label tryStart = new Label(), tryEnd = new Label(), catchStart = new Label(), catchEnd = new Label();
+        if (function.isContentErrorSource()) {
+            mv.visitTryCatchBlock(tryStart, tryEnd, catchStart, CONTENT_ERROR_DESC);
+            mv.visitLabel(tryStart);
+        }
+
+        // Call the function
+        if (function.isStatic()) {
+            mv.visitMethodInsn(INVOKESTATIC, AsmUtil.toName(contextObject), function.javaName(), methodDescriptor(function.returnType(), function.paramTypes()), false);
+        } else {
+            mv.visitMethodInsn(INVOKEVIRTUAL, AsmUtil.toName(contextObject), function.javaName(), methodDescriptor(function.returnType(), function.paramTypes()), false);
+        }
+
+        // Handle error if the function is a content error source
+        if (function.isContentErrorSource()) {
+            mv.visitJumpInsn(GOTO, catchEnd); // We succeeded the call, skip the catch
+
+            mv.visitLabel(tryEnd);
+            mv.visitLabel(catchStart);
+            // The exception is on the top of the stack. Get the message.
+            emitContentErrorOrCoalesce(() -> {
+                // This will consume the exception from the stack.
+                mv.visitMethodInsn(INVOKEVIRTUAL, CONTENT_ERROR_DESC, "getMessage", methodDescriptor(String.class), false);
+            }, () -> {
+                // Otherwise if we didn't need the message, pop the exception.
+                mv.visitInsn(POP);
+            });
+
+            mv.visitLabel(catchEnd);
         }
     }
 
@@ -238,7 +332,45 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
 
     @Override
     public Void visitReturnExpr(@NotNull MqlReturnExpr expr, List<String> strings) {
-        throw new UnsupportedOperationException("not implemented");
+        if (expr.value() != null) {
+            visit(expr.value(), strings);
+        } else {
+            mv.visitInsn(DCONST_0);
+        }
+
+        mv.visitInsn(DRETURN);
+        return null;
+    }
+
+    private void emitContentErrorOrCoalesce(@NotNull String constMessage) {
+        emitContentErrorOrCoalesce(() -> mv.visitLdcInsn(constMessage), null);
+    }
+
+    private void emitContentErrorOrCoalesce(@NotNull Runnable pushMessage, @Nullable Runnable popMessage) {
+        // If there is a waiting coalesce operator, run it and dont emit the error.
+        var coalesce = coalesceValues.get(depthIndex);
+        if (coalesce != null) {
+            if (popMessage != null) popMessage.run();
+            coalesce.run();
+            return;
+        }
+
+        // Get the handler field (not null so no check needed)
+        mv.visitFieldInsn(Opcodes.GETFIELD, owningClass, CONTENT_ERROR_HANDLER_NAME, CONTENT_ERROR_HANDLER_DESC);
+
+        // new ContentError(0, constMessage)
+        mv.visitTypeInsn(NEW, CONTENT_ERROR_DESC);
+        mv.visitInsn(DUP); // One for constructor, one for field
+        mv.visitInsn(ICONST_0); //todo pass a real script index
+        pushMessage.run();
+        mv.visitMethodInsn(INVOKESPECIAL, CONTENT_ERROR_DESC, "<init>",
+                methodDescriptor(void.class, int.class, ContentError.class), false);
+
+        // contentErrorHandler.handle(contentError)
+        mv.visitMethodInsn(INVOKEINTERFACE, CONTENT_ERROR_HANDLER_DESC, "handle", methodDescriptor(void.class, ContentError.class), true);
+
+        // All content errors evaluate to zero.
+        mv.visitInsn(DCONST_0);
     }
 
     @Override

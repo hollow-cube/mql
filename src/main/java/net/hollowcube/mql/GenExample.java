@@ -9,12 +9,14 @@ public class GenExample implements MqlModule.Instance {
             new ScriptA(), new ScriptB()
     };
 
+    private ContentError.Handler contentErrorHandler;
+
     // Variables used by scripts
     private double x;
     private double y;
     private double z;
 
-    GenExample() {
+    GenExample(ContentError.Handler contentErrorHandler) {
         {   // Initializer 1
             double x = 0;
             double y = 0;
@@ -36,7 +38,12 @@ public class GenExample implements MqlModule.Instance {
         public void run() {
             x = 1;
             y = 2;
-            z = 3;
+            double lhs = 2, rhs = 0;
+            if (rhs == 0) {
+                z = Double.NaN;
+            } else {
+                z = lhs / rhs;
+            }
         }
     }
 
