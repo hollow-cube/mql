@@ -17,6 +17,8 @@ public record ContentError(
         @NotNull String message
         // TODO: Include source location for the offending call
 ) {
+    public static final Handler NOOP_HANDLER = (error) -> {
+    };
 
     /**
      * A callback when a {@link ContentError} is generated during script evaluation.

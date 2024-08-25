@@ -1,4 +1,4 @@
-package net.hollowcube.mql.internal;
+package net.hollowcube.mql.internal.type;
 
 public enum MqlType {
     NUMBER,

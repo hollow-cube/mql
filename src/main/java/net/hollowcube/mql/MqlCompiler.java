@@ -4,6 +4,7 @@ import net.hollowcube.mql.builtin.MqlMath;
 import net.hollowcube.mql.foreign.Query;
 import net.hollowcube.mql.util.MqlCompileError;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
 
@@ -27,14 +28,14 @@ public sealed interface MqlCompiler permits MqlCompilerImpl {
      */
     static <T> @NotNull Supplier<T> compile(@NotNull Class<T> t, @NotNull String text, boolean isSimpleExpr) {
         var compiler = create();
-        var ref = compiler.addScript(t, text, isSimpleExpr);
+        var ref = compiler.addScript(t, text, isSimpleExpr, null);
         var module = compiler.compile();
         if (!module.isValid()) throw new MqlCompileError(module.errors());
         return () -> module.newInstance().getScript(ref);
     }
 
     static @NotNull MqlCompiler create() {
-        throw new UnsupportedOperationException("todo");
+        return new MqlCompilerImpl();
     }
 
     /**
@@ -54,9 +55,10 @@ public sealed interface MqlCompiler permits MqlCompilerImpl {
      * Adds an initializer block to the module. This block will be executed when the module is instantiated. It is
      * generally used for initializing variables, and does not have target to any declared context objects.
      *
-     * @param text The script text to evaluate.
+     * @param text      The script text to evaluate.
+     * @param debugName A name to be shown when errors are generated.
      */
-    void addInitializer(@NotNull String text);
+    void addInitializer(@NotNull String text, @Nullable String debugName);
 
     /**
      * Adds a script to the module. The script will have target to the query objects in its environment. The returned
@@ -66,10 +68,11 @@ public sealed interface MqlCompiler permits MqlCompilerImpl {
      * @param text         The script text to evaluate.
      * @param isSimpleExpr True if the script is a simple expression (one expression, no ;), false for a complex
      *                     block which requires ; as well as a return statement to return a rhs.
+     * @param debugName    A name to be shown when errors are generated.
      * @param <T>          The script interface to implement.
      * @return The compilation unit.
      */
-    <T> @NotNull Unit<T> addScript(@NotNull Class<T> spec, @NotNull String text, boolean isSimpleExpr);
+    <T> @NotNull Unit<T> addScript(@NotNull Class<T> spec, @NotNull String text, boolean isSimpleExpr, @Nullable String debugName);
 
     /**
      * <p>Compile the module and return it. Compilation errors will not be thrown, you should inspect

@@ -4,6 +4,8 @@ plugins {
     `maven-publish`
     signing
     alias(libs.plugins.nexuspublish)
+
+    id("me.champeau.jmh") version "0.7.2"
 }
 
 group = "dev.hollowcube"
@@ -12,6 +14,9 @@ description = "An interpreter and JIT compiler for a subset of Molang"
 
 repositories {
     mavenCentral()
+
+    // Other molang impls for comparison
+    maven("https://maven.blamejared.com/") // moonflower's molang-compiler
 }
 
 dependencies {
@@ -20,6 +25,11 @@ dependencies {
 
     testImplementation(platform("org.junit:junit-bom:5.9.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+
+    // Other molang impls for comparison
+    jmhImplementation(files("./src/jmh/libs/bedrockk-molang-1.0.jar"))
+    jmhImplementation("gg.moonflower:molang-compiler:3.1.1.19")
+    jmhImplementation("team.unnamed:mocha:3.0.0")
 }
 
 java {

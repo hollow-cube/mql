@@ -1,9 +1,11 @@
 package net.hollowcube.mql.internal.visitor;
 
 import net.hollowcube.mql.ContentError;
+import net.hollowcube.mql.foreign.ContentErrorException;
+import net.hollowcube.mql.internal.AsmUtil;
 import net.hollowcube.mql.internal.ForeignFunction;
+import net.hollowcube.mql.internal.MqlCodeBuilder;
 import net.hollowcube.mql.internal.tree.*;
-import net.hollowcube.mql.jit.AsmUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.objectweb.asm.Label;
@@ -15,29 +17,44 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import static net.hollowcube.mql.internal.AsmUtil.*;
+import static net.hollowcube.mql.internal.MqlCodeBuilder.CONTENT_ERROR_HANDLER_NAME;
 import static net.hollowcube.mql.internal.visitor.VariableExtractionVisitor.LOCAL_NAMES;
-import static net.hollowcube.mql.jit.AsmUtil.methodDescriptor;
+import static net.hollowcube.mql.internal.visitor.VariableExtractionVisitor.VARIABLE_NAMES;
 import static org.objectweb.asm.Opcodes.*;
 
 public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
-    private static final String CONTENT_ERROR_DESC = AsmUtil.toDescriptor(ContentError.class);
-    private static final String CONTENT_ERROR_HANDLER_DESC = AsmUtil.toDescriptor(ContentError.Handler.class);
-
-    private static final String CONTENT_ERROR_HANDLER_NAME = "contentError$Handler";
-
-    private final String owningClass;
     private final MethodVisitor mv;
 
-    private final Map<String, Class<?>> contextObjects;
+    private final String varHolderClass;
+    // Present when writing a script class, not when writing an initializer function
+    // Controls how the var holder reference is fetched (script = field, init = local)
+    private final @Nullable String scriptClass;
 
+    private final int localsStart;
+
+    private final Map<String, Map.Entry<Integer, Class<?>>> context;
+
+    // Holds writers for the null coalesce right hand expressions which are
+    // written only if a null coalesce operator is encountered at the same
+    // depth for which it was defined.
+    private final Map<Integer, Runnable> coalesceValues = new HashMap<>();
     private int depthIndex = 0;
-    private Map<Integer, Runnable> coalesceValues = new HashMap<>();
 
-    public BytecodeGenerator(@NotNull String owningClass, @NotNull MethodVisitor mv, @NotNull Map<String, Class<?>> contextObjects) {
-        this.owningClass = owningClass;
+    public BytecodeGenerator(
+            @NotNull MethodVisitor mv,
+            int localsStart,
+            @Nullable String scriptClass,
+            @NotNull String varHolderClass,
+            @NotNull Map<String, Map.Entry<Integer, Class<?>>> context
+    ) {
         this.mv = mv;
+        this.localsStart = localsStart;
 
-        this.contextObjects = contextObjects;
+        this.varHolderClass = varHolderClass;
+        this.scriptClass = scriptClass;
+
+        this.context = context;
     }
 
     @Override
@@ -133,7 +150,8 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
         mv.visitJumpInsn(IFNE, notZero);
 
         // If the divisor is zero, it is a content error.
-        mv.visitInsn(POP2); // Get rid of LHS and RHS
+        mv.visitInsn(POP2); // Get rid of LHS and RHS (both are category 2 types)
+        mv.visitInsn(POP2);
         emitContentErrorOrCoalesce("Division by zero"); // Leaves 0 on stack
         mv.visitJumpInsn(GOTO, end);
 
@@ -204,7 +222,11 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
             }
 
             // Add 1 because 0 is always reserved for `this`.
-            mv.visitVarInsn(DLOAD, localIndex + 1);
+            mv.visitVarInsn(DLOAD, localsStart + localIndex);
+            return null;
+        } else if (VARIABLE_NAMES.contains(ident.value())) {
+            pushVarHolderRef();
+            mv.visitFieldInsn(GETFIELD, varHolderClass, expr.target(), "D");
             return null;
         }
 
@@ -228,13 +250,47 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
                 throw new UnsupportedOperationException("invalid local (" + expr.target().target() + ") in assignment");
             }
 
+            // Copy the value we are storing because it also is the result value of this expr.
+            mv.visitInsn(DUP2);
+
             // Add 1 because 0 is always reserved for `this`.
-            mv.visitVarInsn(DSTORE, localIndex + 1);
+            mv.visitVarInsn(DSTORE, localsStart + localIndex);
+        } else if (VARIABLE_NAMES.contains(ident.value())) {
+            mv.visitInsn(DUP2); // Keep another copy of the value for the result of the expression
+
+            pushVarHolderRef();
+
+            // There is sort of a tricky swap required here. The stack currently looks something like this:
+            // { double, double_2nd, 'vars ref' }
+            // But we need to swap the double and the vars ref. There is no particularly good vm instruction
+            // for this operation, so we do the following:
+            // DUP_X2 which clones the vars ref and moves it before the double resulting in the following:
+            // { 'vars ref', double, double_2nd, 'vars ref' }
+            // This is good except for that extra vars ref, so we just pop that.
+
+            mv.visitInsn(DUP_X2);
+            mv.visitInsn(POP); // Extraneous vars ref
+
+            mv.visitFieldInsn(PUTFIELD, varHolderClass, expr.target().target(), "D");
+
+            // The duplicated double is left on the stack for later.
         } else {
             throw new UnsupportedOperationException("invalid assignment target");
         }
 
         return null;
+    }
+
+    private void pushVarHolderRef() {
+        if (scriptClass == null) {
+            mv.visitVarInsn(ALOAD, 0); // Field ref
+            return;
+        }
+
+        // Read from the vars field in the script class
+        mv.visitVarInsn(ALOAD, 0); // this
+        mv.visitFieldInsn(GETFIELD, scriptClass, MqlCodeBuilder.VAR_HOLDER_FIELD_NAME,
+                "L" + varHolderClass + ";");
     }
 
     @Override
@@ -251,19 +307,27 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
     public Void visitBlockExpr(@NotNull MqlBlockExpr expr, List<String> strings) {
         for (var child : expr.exprs()) {
             visit(child, strings);
-            mv.visitInsn(POP); // Pop the result of the expression
+            mv.visitInsn(POP2); // Pop the result of the expression
         }
+        mv.visitInsn(DCONST_0); // Blocks always evaluate to zero
         return null;
     }
 
     private void visitAnyCall(@NotNull String object, @NotNull String method, @NotNull List<MqlExpr> args) {
-        var contextObject = contextObjects.get(object.toLowerCase(Locale.ROOT)); // Molang is case-insensitive
+        var contextObject = context.get(object.toLowerCase(Locale.ROOT)); // Molang is case-insensitive
         if (contextObject == null) throw new UnsupportedOperationException("object not found " + object);
 
-        var function = ForeignFunction.lookup(contextObject, method);
+        var function = ForeignFunction.lookup(contextObject.getValue(), method);
         if (function == null) {
             var msg = String.format("method not found %s.%s#%d", object, method, args.size());
             throw new UnsupportedOperationException(msg);
+        }
+
+        // Load the context object if it is not static
+        if (!function.isStatic()) {
+            if (contextObject.getKey() == -1)
+                throw new UnsupportedOperationException("libraries must only have static functions");
+            mv.visitVarInsn(ALOAD, contextObject.getKey());
         }
 
         // Validate then push all arguments on the stack, and convert them to the appropriate java type.
@@ -280,15 +344,15 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
         // Setup try catch if the function is a content error source.
         Label tryStart = new Label(), tryEnd = new Label(), catchStart = new Label(), catchEnd = new Label();
         if (function.isContentErrorSource()) {
-            mv.visitTryCatchBlock(tryStart, tryEnd, catchStart, CONTENT_ERROR_DESC);
+            mv.visitTryCatchBlock(tryStart, tryEnd, catchStart, toName(ContentErrorException.class));
             mv.visitLabel(tryStart);
         }
 
         // Call the function
         if (function.isStatic()) {
-            mv.visitMethodInsn(INVOKESTATIC, AsmUtil.toName(contextObject), function.javaName(), methodDescriptor(function.returnType(), function.paramTypes()), false);
+            mv.visitMethodInsn(INVOKESTATIC, AsmUtil.toName(contextObject.getValue()), function.javaName(), methodDescriptor(function.returnType(), function.paramTypes()), false);
         } else {
-            mv.visitMethodInsn(INVOKEVIRTUAL, AsmUtil.toName(contextObject), function.javaName(), methodDescriptor(function.returnType(), function.paramTypes()), false);
+            mv.visitMethodInsn(INVOKEVIRTUAL, AsmUtil.toName(contextObject.getValue()), function.javaName(), methodDescriptor(function.returnType(), function.paramTypes()), false);
         }
 
         // Handle error if the function is a content error source
@@ -300,7 +364,7 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
             // The exception is on the top of the stack. Get the message.
             emitContentErrorOrCoalesce(() -> {
                 // This will consume the exception from the stack.
-                mv.visitMethodInsn(INVOKEVIRTUAL, CONTENT_ERROR_DESC, "getMessage", methodDescriptor(String.class), false);
+                mv.visitMethodInsn(INVOKEVIRTUAL, toName(ContentErrorException.class), "getMessage", methodDescriptor(String.class), false);
             }, () -> {
                 // Otherwise if we didn't need the message, pop the exception.
                 mv.visitInsn(POP);
@@ -356,18 +420,21 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
         }
 
         // Get the handler field (not null so no check needed)
-        mv.visitFieldInsn(Opcodes.GETFIELD, owningClass, CONTENT_ERROR_HANDLER_NAME, CONTENT_ERROR_HANDLER_DESC);
+        pushVarHolderRef(); // Var holder contains the content error handler
+        mv.visitFieldInsn(Opcodes.GETFIELD, varHolderClass, CONTENT_ERROR_HANDLER_NAME,
+                toDescriptor(ContentError.Handler.class));
 
         // new ContentError(0, constMessage)
-        mv.visitTypeInsn(NEW, CONTENT_ERROR_DESC);
+        mv.visitTypeInsn(NEW, toName(ContentError.class));
         mv.visitInsn(DUP); // One for constructor, one for field
         mv.visitInsn(ICONST_0); //todo pass a real script index
         pushMessage.run();
-        mv.visitMethodInsn(INVOKESPECIAL, CONTENT_ERROR_DESC, "<init>",
+        mv.visitMethodInsn(INVOKESPECIAL, toName(ContentError.class), "<init>",
                 methodDescriptor(void.class, int.class, ContentError.class), false);
 
         // contentErrorHandler.handle(contentError)
-        mv.visitMethodInsn(INVOKEINTERFACE, CONTENT_ERROR_HANDLER_DESC, "handle", methodDescriptor(void.class, ContentError.class), true);
+        mv.visitMethodInsn(INVOKEINTERFACE, toName(ContentError.Handler.class),
+                "handle", methodDescriptor(void.class, ContentError.class), true);
 
         // All content errors evaluate to zero.
         mv.visitInsn(DCONST_0);

@@ -1,4 +1,4 @@
-package net.hollowcube.mql.jit;
+package net.hollowcube.mql.internal;
 
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassReader;
@@ -11,7 +11,6 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 
 public final class AsmUtil {
@@ -74,42 +73,6 @@ public final class AsmUtil {
         }
         //todo handle other conversions
         throw new UnsupportedOperationException("Cannot convert from " + from + " to " + to);
-    }
-
-    @SuppressWarnings("all")
-    public static Class<?> loadClass(String className, byte[] b) {
-        try {
-            var lookup = MethodHandles.lookup();
-            var a = lookup.defineHiddenClass(b, true);
-            return a.lookupClass();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e);
-        }
-//         Override defineClass (as it is protected) and define the class.
-//        Class<?> clazz = null;
-//        try {
-//            ClassLoader loader = ClassLoader.getSystemClassLoader();
-//            Class<?> cls = (Class<?>) Class.forName("java.lang.ClassLoader");
-//            java.lang.reflect.Method method =
-//                    cls.getDeclaredMethod(
-//                            "defineClass",
-//                            new Class[]{String.class, byte[].class, int.class, int.class});
-//
-//            // Protected method invocation.
-//            method.setAccessible(true);
-//            try {
-//                Object[] args =
-//                        new Object[]{className, b, 0, b.length};
-//                clazz = (Class<?>) method.invoke(loader, args);
-//            } finally {
-//                method.setAccessible(false);
-//            }
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//            System.exit(1);
-//        }
-//        return clazz;
     }
 
     public static @NotNull String prettyPrintEvalMethod(byte[] bytecode) {

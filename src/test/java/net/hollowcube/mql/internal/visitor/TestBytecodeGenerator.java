@@ -1,7 +1,7 @@
 package net.hollowcube.mql.internal.visitor;
 
 import net.hollowcube.mql.builtin.MqlMath;
-import net.hollowcube.mql.jit.AsmUtil;
+import net.hollowcube.mql.internal.AsmUtil;
 import net.hollowcube.mql.parser.MqlParser;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
@@ -66,13 +66,15 @@ public class TestBytecodeGenerator {
                 DCMPL
                 IFNE L0
                 POP2
-                GETFIELD net/hollowcube/mql/TestBytecodeGenerator.contentError$Handler : Lnet/hollowcube/mql/ContentError$Handler;
-                NEW Lnet/hollowcube/mql/ContentError;
+                POP2
+                ALOAD 0
+                GETFIELD net/hollowcube/mql/internal/VarHolder$TEST.mql$contentErrorHandler : Lnet/hollowcube/mql/ContentError$Handler;
+                NEW net/hollowcube/mql/ContentError
                 DUP
                 ICONST_0
                 LDC "Division by zero"
-                INVOKESPECIAL Lnet/hollowcube/mql/ContentError;.<init> (ILnet/hollowcube/mql/ContentError;)V
-                INVOKEINTERFACE Lnet/hollowcube/mql/ContentError$Handler;.handle (Lnet/hollowcube/mql/ContentError;)V (itf)
+                INVOKESPECIAL net/hollowcube/mql/ContentError.<init> (ILnet/hollowcube/mql/ContentError;)V
+                INVOKEINTERFACE net/hollowcube/mql/ContentError$Handler.handle (Lnet/hollowcube/mql/ContentError;)V (itf)
                 DCONST_0
                 GOTO L1
                 L0
@@ -90,6 +92,7 @@ public class TestBytecodeGenerator {
                 DCONST_0
                 DCMPL
                 IFNE L0
+                POP2
                 POP2
                 LDC 2.0
                 GOTO L1
@@ -164,6 +167,7 @@ public class TestBytecodeGenerator {
     public void localVariableAssign() {
         assertCompilation(List.of("x"), "t.x = 1", """
                 DCONST_1
+                DUP2
                 DSTORE 1
                 """);
     }
@@ -172,6 +176,28 @@ public class TestBytecodeGenerator {
     public void localVariableRead() {
         assertCompilation(List.of("x"), "t.x", """
                 DLOAD 1
+                """);
+    }
+
+    @Test
+    public void fieldVariableAssign() {
+        // The bytecode for this looks kinda strange, check BytecodeGenerator#visitAssignExpr
+        // for an explanation of why its like this.
+        assertCompilation("v.x = 1", """
+                DCONST_1
+                DUP2
+                ALOAD 0
+                DUP_X2
+                POP
+                PUTFIELD net/hollowcube/mql/internal/VarHolder$TEST.x : D
+                """);
+    }
+
+    @Test
+    public void fieldVariableRead() {
+        assertCompilation("v.x", """
+                ALOAD 0
+                GETFIELD net/hollowcube/mql/internal/VarHolder$TEST.x : D
                 """);
     }
 
@@ -211,13 +237,14 @@ public class TestBytecodeGenerator {
                 INVOKESTATIC net/hollowcube/mql/builtin/MqlMath.mod (DD)D
                 GOTO L1
                 L2
-                GETFIELD net/hollowcube/mql/TestBytecodeGenerator.contentError$Handler : Lnet/hollowcube/mql/ContentError$Handler;
-                NEW Lnet/hollowcube/mql/ContentError;
+                ALOAD 0
+                GETFIELD net/hollowcube/mql/internal/VarHolder$TEST.mql$contentErrorHandler : Lnet/hollowcube/mql/ContentError$Handler;
+                NEW net/hollowcube/mql/ContentError
                 DUP
                 ICONST_0
-                INVOKEVIRTUAL Lnet/hollowcube/mql/ContentError;.getMessage ()Ljava/lang/String;
-                INVOKESPECIAL Lnet/hollowcube/mql/ContentError;.<init> (ILnet/hollowcube/mql/ContentError;)V
-                INVOKEINTERFACE Lnet/hollowcube/mql/ContentError$Handler;.handle (Lnet/hollowcube/mql/ContentError;)V (itf)
+                INVOKEVIRTUAL net/hollowcube/mql/foreign/ContentErrorException.getMessage ()Ljava/lang/String;
+                INVOKESPECIAL net/hollowcube/mql/ContentError.<init> (ILnet/hollowcube/mql/ContentError;)V
+                INVOKEINTERFACE net/hollowcube/mql/ContentError$Handler.handle (Lnet/hollowcube/mql/ContentError;)V (itf)
                 DCONST_0
                 L1
                 """);
@@ -244,13 +271,14 @@ public class TestBytecodeGenerator {
 
     private void assertCompilation(@NotNull List<String> locals, @NotNull String source, @NotNull String expected) {
         var cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        var className = "net/hollowcube/mql/TestBytecodeGenerator";
+        var className = "net/hollowcube/mql/internal/VarHolder$TEST";
         cw.visit(V21, ACC_PUBLIC, className, null, "java/lang/Object", null);
         var mv = cw.visitMethod(ACC_PUBLIC, "evaluate", "()D", null, null);
 
         var expr = new MqlParser(source, true).parse();
-        var mathContext = Map.<String, Class<?>>of("m", MqlMath.class, "math", MqlMath.class);
-        new BytecodeGenerator(className, mv, mathContext).visit(expr, locals);
+        var mathContext = Map.<String, Map.Entry<Integer, Class<?>>>of(
+                "m", Map.entry(-1, MqlMath.class), "math", Map.entry(-1, MqlMath.class));
+        new BytecodeGenerator(mv, 1, null, className, mathContext).visit(expr, locals);
 
         mv.visitEnd();
 
