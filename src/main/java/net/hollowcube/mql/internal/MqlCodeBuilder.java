@@ -230,7 +230,7 @@ public class MqlCodeBuilder {
         try {
             return new MqlParser(text, isSimpleExpr).parse();
         } catch (MqlParseError e) {
-            this.errors.add(e.getMessage());
+            this.errors.add(e.getMessage() + ": " + text);
             return null;
         }
     }

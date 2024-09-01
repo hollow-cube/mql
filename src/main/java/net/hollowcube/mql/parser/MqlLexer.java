@@ -20,10 +20,9 @@ public class MqlLexer {
      */
     public @Nullable MqlToken next() {
         start = cursor;
-
-        if (atEnd()) return null;
-
+        
         consumeWhitespace();
+        if (atEnd()) return null;
 
         char c = advance();
         if (isAlpha(c))
@@ -43,6 +42,7 @@ public class MqlLexer {
      * @throws MqlParseError if there is an unexpected token.
      */
     public @Nullable MqlToken peek() {
+        if (atEnd()) return null;
         var result = next();
         cursor = start; // Reset to where it was before the call to next.
         return result;

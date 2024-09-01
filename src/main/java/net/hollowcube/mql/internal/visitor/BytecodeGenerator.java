@@ -296,7 +296,7 @@ public class BytecodeGenerator implements MqlVisitor<List<String>, Void> {
     @Override
     public Void visitCallExpr(@NotNull MqlCallExpr expr, List<String> strings) {
         if (!(expr.target() instanceof MqlAccessExpr access))
-            throw new UnsupportedOperationException("Invalid call target");
+            throw new UnsupportedOperationException("Invalid call target: " + expr.target());
         if (!(access.lhs() instanceof MqlIdentExpr ident))
             throw new UnsupportedOperationException("Structs are not supported.");
         visitAnyCall(ident.value(), access.target(), expr.argList().args());
